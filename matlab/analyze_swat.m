@@ -1,24 +1,44 @@
 clc
 clear all
 close all
-%swat_nominal = load_swat('SWaT_Dataset_Normal_v1.xlsx');
-%swat_attack = load_swat('SWaT_Dataset_Attack_v0.xlsx');
+%swat_nominal = load_swat('../swat/SWaT_Dataset_Normal_v1.xlsx');
+%swat_attack = load_swat('../swat/SWaT_Dataset_Attack_v0.xlsx');
 %save('swat_nominal.mat','swat_nominal');
 %save('swat_attack.mat','swat_attack');
 
-%  load('swat_nominal.mat');
-%  [P1n,P2n,P3n,P4n,P5n,P6n] = parse_swat(swat_nominal);
+vars = {'sensors_data','swat_nominal','swat_attack','P1T','P1n','P2n','P3n','P4n','P5n','P6n','P1a','P2a','P3a','P4a','P5a','P6a'};
+
+load('swat_nominal.mat');
+[P1n,P2n,P3n,P4n,P5n,P6n] = parse_swat(swat_nominal);
 %  plot_swat(P1n,P2n,P3n,P4n,P5n,P6n);
 
 load('swat_attack.mat');
 [P1a,P2a,P3a,P4a,P5a,P6a] = parse_swat(swat_attack);
-plot_swat(P1a,P2a,P3a,P4a,P5a,P6a);
+%plot_swat(P1a,P2a,P3a,P4a,P5a,P6a);
 
-% deprecate features MADICS
-% variance is 0 :  P202, P301, P401, P404, P502, P601
-% K-S Statistic higher than 0.25 : AIT402, AIT201, AIT501, AIT502, AIT202, AIT504, FIT301, PIT502, PIT503, FIT503, PIT501, AIT203, AIT401, AIT503, FIT601
-% Training and test empirical distributions do not match : P201
-%
-%
-%
-%
+P1T = [P1n; P1a];
+P1T.Normal(:) = 0;
+
+startTime = '12/23/2015 14:00:00';
+TR = timerange(startTime,'inf');
+P1 =  P1T(TR,:);
+
+dfinish_training = datetime('28/12/2015 9:59:59','InputFormat','dd/MM/uuuu HH:mm:ss');
+TrainSamplesCount = find(P1.Time == dfinish_training);
+disp(['train samples count is ' num2str(TrainSamplesCount)]);
+
+sensors_data = P1.Variables;
+n_all_data = size(sensors_data,2)-1; %remove 'Normal' label
+sensors_data = sensors_data(:,1:n_all_data);
+writematrix(sensors_data,['../HTM_input/P1_data.csv']) 
+ 
+meta_data = zeros(1,1+2*n_all_data);
+meta_data(1) = TrainSamplesCount;
+meta_data(2:n_all_data+1) = floor(min(sensors_data));
+meta_data(n_all_data+2:2*n_all_data+1) = ceil(max(sensors_data));
+writematrix(meta_data,['../HTM_input/P1_meta.csv']) 
+
+clear(vars{:})
+
+plot_swat_P1(P1);
+
