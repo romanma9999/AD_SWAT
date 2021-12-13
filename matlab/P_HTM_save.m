@@ -16,19 +16,18 @@ load('swat_attack.mat');
 [P1a,P2a,P3a,P4a,P5a,P6a] = parse_swat(swat_attack);
 %plot_swat(P1a,P2a,P3a,P4a,P5a,P6a);
 
-P1T = [P1n; P1a];
-P1T.Normal(:) = 0;
-
+PID = 1;
 startTime = '12/23/2015 14:00:00';
-TR = timerange(startTime,'inf');
-P1 =  P1T(TR,:);
+finishTrainingTime = datetime('28/12/2015 9:59:59','InputFormat','dd/MM/uuuu HH:mm:ss');
 
-dfinish_training = datetime('28/12/2015 9:59:59','InputFormat','dd/MM/uuuu HH:mm:ss');
-TrainSamplesCount = find(P1.Time == dfinish_training);
+P1 = P_preprocess(P1n, P1a, startTime,PID);
+P_plot(P1,[1 2 3 4],PID);
+
+TrainSamplesCount = find(P1.Time == finishTrainingTime);
 disp(['train samples count is ' num2str(TrainSamplesCount)]);
 
 sensors_data = P1.Variables;
-n_all_data = size(sensors_data,2)-1; %remove 'Normal' label
+n_all_data = size(sensors_data,2)-1; %remove 'Anomaly' label
 sensors_data = sensors_data(:,1:n_all_data);
 writematrix(sensors_data,['../HTM_input/P1_data.csv']) 
  
@@ -40,5 +39,5 @@ writematrix(meta_data,['../HTM_input/P1_meta.csv'])
 
 clear(vars{:})
 
-plot_swat_P1(P1);
+
 

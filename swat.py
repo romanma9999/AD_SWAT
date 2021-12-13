@@ -48,7 +48,8 @@ default_parameters = {
 }
 
 def main(batch_param, filename_prefix, parameters=default_parameters, argv=None, verbose=True):
-    input_filepath = ''.join([_INPUT_FILE_PATH, filename_prefix, '.csv'])
+    input_filepath = ''.join([_INPUT_FILE_PATH, filename_prefix, '_data.csv'])
+    meta_filepath = ''.join([_INPUT_FILE_PATH, filename_prefix, '_meta.csv'])
     if batch_param:
         group_name = batch_param["group_name"];
         param_name = batch_param["param_name"];
@@ -59,13 +60,13 @@ def main(batch_param, filename_prefix, parameters=default_parameters, argv=None,
             else:
                 parameters[group_name][param_name] = value;
             output_filepath = ''.join([_OUTPUT_FILE_PATH, filename_prefix, '_', param_name, '_', str(value), '.csv'])
-            runner(parameters=parameters, verbose=verbose,input_filepath = input_filepath,output_filepath = output_filepath)
+            runner(parameters=parameters, verbose=verbose,input_filepath = input_filepath,meta_filepath=meta_filepath,output_filepath = output_filepath)
     else:
         output_filepath = ''.join([_OUTPUT_FILE_PATH, filename_prefix, '_res.csv'])
-        runner(parameters=parameters, verbose=verbose,input_filepath = input_filepath,output_filepath = output_filepath)
+        runner(parameters=parameters, verbose=verbose,input_filepath = input_filepath,meta_filepath=meta_filepath,output_filepath = output_filepath)
 
 
-def runner(parameters, verbose,input_filepath,output_filepath):
+def runner(parameters, verbose,input_filepath,meta_filepath,output_filepath):
 
   if verbose:
     import pprint
@@ -75,17 +76,24 @@ def runner(parameters, verbose,input_filepath,output_filepath):
 
   # Read the input file.
   inputs = []
-  maximum_value = 0;
-  minimum_value = 0;
-  training_count = 0;
-  with open(input_filepath, "r") as fin:
-    reader = csv.reader(fin)
-    training_count = int(next(reader)[0])
-    minimum_value = float(next(reader)[0])
-    maximum_value = float(next(reader)[0])
+  meta = []
 
-    for record in reader:
-      inputs.append(float(record[0]));
+  with open(input_filepath, "r") as fin:
+      reader = csv.reader(fin)
+      for record in reader:
+          inputs.append(float(record[0]));
+
+  with open(meta_filepath, "r") as fin:
+      reader = csv.reader(fin)
+      for record in reader:
+          meta.extend(record);
+
+  training_count = int(meta[0]);
+  minimum_value = float(meta[1]);
+  maximum_value = float(meta[5]);
+  minimum_value = 100;
+  maximum_value = 1000;
+  print(f"training count {training_count} minval {minimum_value} maxval {maximum_value}");
 
   scalarEncoderParams            = ScalarEncoderParameters()
   scalarEncoderParams.size       = parameters["enc"]["value"]["size"]    # SDR size 1638
@@ -172,9 +180,10 @@ def runner(parameters, verbose,input_filepath,output_filepath):
     anomalyProb.append( anomaly_history.compute(tm.anomaly) )
 
     predictor.learn(count, tm_active_cells, int((value-minimum_value) / predictor_resolution))
-    if count < 5 or count % 1000 == 0:
-       print(".",end =" ")
-
+    if count > 1 and count % 100000 == 0:
+       print(f"{count}")
+    if count < 5 or count % 10000 == 0:
+       print(".", end=" ")
 
   # Print information & statistics about the state of the HTM.
   print("Encoded Input", enc_info)
@@ -229,5 +238,5 @@ def runner(parameters, verbose,input_filepath,output_filepath):
 if __name__ == "__main__":
   print('running ..')
   batch_param = {'group_name':'tm','param_name':'permanenceDec', 'values' : [70,80,90,100], 'values_res':1000};
-  filename_prefix = 'data4';
+  filename_prefix = 'P1';
   main(batch_param = [], filename_prefix = filename_prefix)

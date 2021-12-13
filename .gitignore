@@ -5,3 +5,6 @@
 /HTM_input/P1_meta.csv
 /matlab/plot_swat_P1.asv
 /matlab/analyze_swat.asv
+/HTM_results/P1_res_LIT101_continuous_learning.csv
+/HTM_results/P1_res_LIT101_learning_twice.csv
+/HTM_results/P1_res_LIT101_with_training.csv
