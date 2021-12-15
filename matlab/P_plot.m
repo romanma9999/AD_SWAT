@@ -12,7 +12,7 @@ if n_var_to_plot == 0
      var_to_plot = 1:n_var_to_plot;
 end
 
-Pvar = (Pvar - min(Pvar))./(max(Pvar) - min(Pvar));
+%Pvar = (Pvar - min(Pvar))./(max(Pvar) - min(Pvar));
 Ptime = P.Time;
 
 figure;

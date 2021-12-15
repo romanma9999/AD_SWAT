@@ -17,4 +17,24 @@ function P = P_preprocess(Pn,Pa,startTime, PID)
       TR = timerange(dstart,dend);
       P(TR,:).Anomaly(:) = 1;
     end
+
+
+[m,n] = size(P.Variables);
+val = zeros(m,1);
+
+switch PID
+    case 1
+         for i = 1:m
+             val(i,1) = 4*P.MV101(i) + 2*(P.P101(i)-1) + (P.P102(i)-1);  %transform MV101(0/1/2),P101(1/2),P102(1/2) to one discrete variable with range 0-11
+         end
+    case 2
+
 end
+
+P = addvars(P,val,'Before','Anomaly','NewVariableNames','CombinedState');
+
+end
+
+
+
+

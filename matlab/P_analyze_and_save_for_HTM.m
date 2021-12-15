@@ -21,16 +21,19 @@ startTime = '12/23/2015 14:00:00';
 finishTrainingTime = datetime('28/12/2015 9:59:59','InputFormat','dd/MM/uuuu HH:mm:ss');
 
 P1 = P_preprocess(P1n, P1a, startTime,PID);
-P_plot(P1,[1 2 3 4],PID);
+P_plot(P1,[1 2 3 4 5],PID);
 
 TrainSamplesCount = find(P1.Time == finishTrainingTime);
 disp(['train samples count is ' num2str(TrainSamplesCount)]);
 
 sensors_data = P1.Variables;
 n_all_data = size(sensors_data,2)-1; %remove 'Anomaly' label
+
+
 sensors_data = sensors_data(:,1:n_all_data);
+
 writematrix(sensors_data,['../HTM_input/P1_data.csv']) 
- 
+
 meta_data = zeros(1,1+2*n_all_data);
 meta_data(1) = TrainSamplesCount;
 meta_data(2:n_all_data+1) = floor(min(sensors_data));
