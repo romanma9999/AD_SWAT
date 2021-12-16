@@ -25,7 +25,7 @@ val = zeros(m,1);
 switch PID
     case 1
          for i = 1:m
-             val(i,1) = 4*P.MV101(i) + 2*(P.P101(i)-1) + (P.P102(i)-1);  %transform MV101(0/1/2),P101(1/2),P102(1/2) to one discrete variable with range 0-11
+             val(i,1) = 1 + 4*P.MV101(i) + 2*(P.P101(i)-1) + (P.P102(i)-1);  %transform MV101(0/1/2),P101(1/2),P102(1/2) to one discrete variable with range 0-12, 0 is reserved for unknown 
          end
     case 2
 
