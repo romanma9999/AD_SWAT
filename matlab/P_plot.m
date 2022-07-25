@@ -15,10 +15,13 @@ end
 %Pvar = (Pvar - min(Pvar))./(max(Pvar) - min(Pvar));
 Ptime = P.Time;
 
-figure;
-
+h = figure;
+tiledlayout(n_var_to_plot,1)
+ax = zeros(1,n_var_to_plot);
 for i = 1:n_var_to_plot
-subplot(n_var_to_plot,1,i)
+%subplot(n_var_to_plot,1,i)
+t = nexttile;
+ax(i) = t;
 prev_start = 1;
 for j = 1:nPA
   dstart = datetime(PA(PA_idx(j)).s,'InputFormat','MM/dd/uuuu HH:mm:ss');
@@ -33,11 +36,15 @@ for j = 1:nPA
 end
   plot(Ptime(iend:end),Pvar(iend:end,var_to_plot(i)),'b');
 
-legend(Pnames(i));
+legend(Pnames(i),'Interpreter', 'none');
 xlabel('datetime');
-ylabel(Pnames(i));
+ylabel(Pnames(i),'Interpreter', 'none');
 grid on;
 end
+
+linkaxes(ax,'x');
+ZoomHandle = zoom(h);
+set(ZoomHandle,'Motion','horizontal');
 
 % figure;
 % stackedplot(P)

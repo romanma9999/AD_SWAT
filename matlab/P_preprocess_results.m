@@ -1,12 +1,92 @@
-function P =  P_preprocess_results(P,anomalylikelihoodThreshold,PID)
+function P =  P_preprocess_results(filename, P,anomalylikelihoodThreshold,PID)
 
-data = load_htm_results_data(['../HTM_results/P' num2str(PID) '_res.csv']);
+data = load_htm_results_data(['../HTM_results/' filename]);
 data.title = "";
 
-tmp = data.anomalylikelihood>anomalylikelihoodThreshold;
-anomaly_tmp = data.anomalylikelihood;
-anomaly_tmp(~tmp) = 0;
-    
-P = addvars(P,data.pred1,data.pred5,anomaly_tmp,data.anomaly,'NewVariableNames',{'Pred1','Pred5','AnomalyLikelihood','AnomalyScore'});
+
+anomaly_without_peaks = data.anomaly;
+%tmp = anomaly_without_peaks>0.8;
+%anomaly_without_peaks(tmp) = 0;
+
+anomaly_mean = movmean(anomaly_without_peaks,[9,0]);
+tmp = anomaly_mean>anomalylikelihoodThreshold;
+anomaly_mean(~tmp) = 0;
+
+s = init_log_anomaly_score(1000);
+log_likelihood_anomaly = zeros(size(data.anomaly));
+
+for i = 1:size(data.anomaly,1)
+[s, log_likelihood_anomaly(i)] = compute_log_anomaly_score(s,anomaly_mean(i));
 end
+
+tmp = log_likelihood_anomaly>anomalylikelihoodThreshold;
+anomaly_tmp = log_likelihood_anomaly;
+anomaly_tmp(~tmp) = 0;
+
+
+anomaly_sum = movsum(anomaly_without_peaks,[59,0]);
+tmp = anomaly_sum>1;
+anomaly_sum(tmp) = 1;
+tmp = anomaly_sum>anomalylikelihoodThreshold;
+anomaly_sum(~tmp) = 0;
+
+
+P = addvars(P,anomaly_mean,anomaly_sum,anomaly_tmp,data.anomaly,'NewVariableNames',{'Temporal Mean Score (10 sec)','Temporal Sum Score (1 min)','Scaled Log Likelihood Score','Instant Score'});
+
+%P = addvars(P,data.pred1,data.pred5,anomaly_tmp,data.anomaly,'NewVariableNames',{'Pred1','Pred5','AnomalyLikelihood','AnomalyScore'});
+end
+
+
+
+function self = init_log_anomaly_score(period)
+    self.period   = period;
+    self.alpha    = 1.0 - exp(-1.0 / self.period);
+    self.mean     = 1.0;
+    self.var      = 0.0003;
+    self.std      = sqrt(self.var);
+    self.prev     = 0.0;
+    self.n_records = 0;
+end
+
+function [s, res] = compute_log_anomaly_score(self, anomaly)
+
+    likelihood = get_likelihood(self,anomaly);
+    self = add_record(self,anomaly);
+    combined = 1 - (1 - likelihood) * (1 - self.prev);
+    self.prev = likelihood;
+    if self.n_records < self.period
+       res = 0.0;
+    else
+      res = get_log_likelihood(combined);
+    end
+    s = self;
+    end
+
+    function s = add_record(self, anomaly)
+
+    diff      = anomaly - self.mean;
+    incr      = self.alpha * diff;
+    self.mean = self.mean + incr;
+    self.var  = (1.0 - self.alpha) * (self.var + diff * incr);
+    self.mean = max(self.mean, 0.03);
+    self.var = max(self.var, 0.0003);
+        
+    self.std = sqrt(self.var);
+    self.n_records = self.n_records + 1;
+    s = self;
+    end
+    
+    function res = get_likelihood(self, anomaly)
+        z = (anomaly - self.mean) / self.std;
+       res = 1.0 - 0.5 * erfc(z/1.4142); 
+    end
+
+    function res = get_log_likelihood(likelihood)
+    %     Math.log(1.0000000001 - likelihood) / Math.log(1.0 - 0.9999999999)
+        res = log(1.0000000001 - likelihood) / -23.02585084720009;
+    end
+
+
+
+
 
