@@ -17,15 +17,14 @@ from htm.bindings.algorithms import TemporalMemory
 from htm.algorithms.anomaly_likelihood import AnomalyLikelihood
 from htm.bindings.algorithms import Predictor
 
-sdr_size = 2048;
-sdr_w = 40;
-sdr_sparsity = 1.01*(float(sdr_w)/sdr_size)
-
 parser = argparse.ArgumentParser(description='runtime configuration for HTM anomaly detection on SWAT')
 parser.add_argument('--stage_name', '-sn', metavar='STAGE_NAME', default='P1', choices=['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], type=str.upper)
 parser.add_argument('--channel_name', '-cn', metavar='CHANNEL_NAME')
+parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
 parser.add_argument('--freeze_type', '-ft', default='off', choices=['off', 'during_training', 'end_training'], type=str.lower)
 parser.add_argument('--learn_type', '-lt', default='always', choices=['always', 'train_only'], type=str.lower)
+parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
+parser.add_argument('--sdr_sparsity', '-sparsity', metavar='SDR_SPARCITY', default=0.02, type=float)
 parser.add_argument('--custom_min', '-cmin', metavar='MIN_VAL', default=2, type=int)
 parser.add_argument('--custom_max', '-cmax', metavar='MAX_VAL', default=3, type=int)
 parser.add_argument('--limits_enabled', '-le', default=False, action='store_true')
@@ -40,11 +39,10 @@ parser.add_argument('--override_parameters', '-op', default="", type=str,
 default_parameters = {
     'enc': {
         "value" :
-            {'size': sdr_size, 'sparsity': sdr_sparsity} #0.02
+            {'size': 2048, 'sparsity': 0.02} #0.02
     },
     'predictor': {'sdrc_alpha': 0.1},
     'sp': {'boostStrength': 3.0,
-           'columnCount': sdr_size,    #1638
            'localAreaDensity': 0.02,
            'potentialPct': 0.85,
            'synPermActiveInc': 0.04,
@@ -57,7 +55,6 @@ default_parameters = {
            'maxSynapsesPerSegment': 96,
            'minThreshold': 3,
            'synPermConnected': 0.13999999999999999,
-           'newSynapseCount': sdr_w,
            'permanenceDec': 0.001,
            'permanenceInc': 0.1},
     'anomaly': {'period': 1000},
@@ -85,6 +82,8 @@ def main(args):
                       }
 
     parameters = default_parameters
+    parameters['enc']['size'] = args.sdr_size
+    parameters['enc']['sparsity'] = args.sdr_sparsity
     parameters['runtime_config'] = runtime_config
 
     if len(args.override_parameters) > 0:
@@ -105,9 +104,9 @@ def main(args):
                 else:
                     parameters[group_name][param_name] = float(param_val)/param_res
 
-    runner(parameters)
+    runner(parameters,args)
 
-def runner(parameters):
+def runner(parameters,args):
     config = parameters['runtime_config']
     verbose = config['verbose']
     stage = config['stage']
@@ -135,12 +134,11 @@ def runner(parameters):
     print(f"training points count: {training_count}")
     print(f"total points count: {len(records)}")
 
-
+    sdr_size = parameters["enc"]["size"]
+    sdr_sparsity = parameters["enc"]["sparsity"]
 
     V1PrmName = config['var_name']
     V1EncoderParams = ScalarEncoderParameters()
-    V1EncoderParams.size = 2048
-    V1EncoderParams.sparsity = 0.02
 
     if config['CustomMinMax'] is True:
         print("Custom MinMax")
@@ -150,6 +148,16 @@ def runner(parameters):
         V1EncoderParams.minimum = features_info[V1PrmName]['min']
         V1EncoderParams.maximum = features_info[V1PrmName]['max']
 
+    if args.channel_type == 0:
+        V1EncoderParams.size = sdr_size
+        V1EncoderParams.sparsity = sdr_sparsity
+    else:
+        V1EncoderParams.category = 1
+
+        V1EncoderParams.activeBits = int(sdr_size/(V1EncoderParams.maximum-V1EncoderParams.minimum+1))
+        sdr_sparsity = float(V1EncoderParams.activeBits/sdr_size)
+        print(f'active bits: {V1EncoderParams.activeBits}')
+
     V1Encoder = ScalarEncoder(V1EncoderParams)
 
     V1EncodingSize = V1Encoder.size
@@ -157,38 +165,40 @@ def runner(parameters):
     enc_info = Metrics( [encodingWidth], 999999999 )
 
     # Make the HTM.  SpatialPooler & TemporalMemory & associated tools.
-    spParams = parameters["sp"]
-    sp = SpatialPooler(
-        inputDimensions            = (encodingWidth,),
-        columnDimensions           = (spParams["columnCount"],),
-        potentialPct               = spParams["potentialPct"],
-        potentialRadius            = encodingWidth,
-        globalInhibition           = True,
-        localAreaDensity           = spParams["localAreaDensity"],
-        synPermInactiveDec         = spParams["synPermInactiveDec"],
-        synPermActiveInc           = spParams["synPermActiveInc"],
-        synPermConnected           = spParams["synPermConnected"],
-        boostStrength              = spParams["boostStrength"],
-        wrapAround                 = True
-    )
-    sp_info = Metrics( sp.getColumnDimensions(), 999999999 )
+
+
+    # spParams = parameters["sp"]
+    # sp = SpatialPooler(
+    #     inputDimensions            = (encodingWidth,),
+    #     columnDimensions           = (sdr_size,),
+    #     potentialPct               = spParams["potentialPct"],
+    #     potentialRadius            = encodingWidth,
+    #     globalInhibition           = True,
+    #     localAreaDensity           = spParams["localAreaDensity"],
+    #     synPermInactiveDec         = spParams["synPermInactiveDec"],
+    #     synPermActiveInc           = spParams["synPermActiveInc"],
+    #     synPermConnected           = spParams["synPermConnected"],
+    #     boostStrength              = spParams["boostStrength"],
+    #     wrapAround                 = True
+    # )
+    # sp_info = Metrics( sp.getColumnDimensions(), 999999999 )
 
     tmParams = parameters["tm"]
     tm = TemporalMemory(
-        columnDimensions          = (parameters["sp"]["columnCount"],),
+        columnDimensions          = (sdr_size,),
         cellsPerColumn            = tmParams["cellsPerColumn"],
         activationThreshold       = tmParams["activationThreshold"],
         initialPermanence         = tmParams["initialPerm"],
         connectedPermanence       = tmParams["synPermConnected"],
         minThreshold              = tmParams["minThreshold"],
-        maxNewSynapseCount        = tmParams["newSynapseCount"],
+        maxNewSynapseCount        = int(sdr_sparsity*sdr_size),
         permanenceIncrement       = tmParams["permanenceInc"],
         permanenceDecrement       = tmParams["permanenceDec"],
         predictedSegmentDecrement = 0.0,
         maxSegmentsPerCell        = tmParams["maxSegmentsPerCell"],
         maxSynapsesPerSegment     = tmParams["maxSynapsesPerSegment"]
     )
-    tm_info = Metrics( [tm.numberOfCells()], 999999999 )
+    tm_info = Metrics([tm.numberOfCells()], 999999999 )
 
     anomaly_history = AnomalyLikelihood(parameters["anomaly"]["period"])
 
@@ -307,14 +317,14 @@ def runner(parameters):
     return
 
 if __name__ == "__main__":
-    # sys.argv = ['P1_LIT101.py',
+    # sys.argv = ['swat_htm.py',
     #             '--stage_name', 'P1',
-    #             '--channel_name', 'LIT101',
+    #             '--channel_name', 'P102',
     #             '--freeze_type', 'off',
     #             '--learn_type', 'always',
     #             '--verbose',
-    #             '--prefix', 'cells_column_4',
-    #             '-op', 'tm,cellsPerColumn,4,1/tm,permanenceDec,2,1000']
+    #             '--sdr_size', '10',
+    #             '-ctype','1']
 
     args = parser.parse_args()
     print(args)

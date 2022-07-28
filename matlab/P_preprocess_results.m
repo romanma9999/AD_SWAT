@@ -24,14 +24,14 @@ anomaly_tmp = log_likelihood_anomaly;
 anomaly_tmp(~tmp) = 0;
 
 
-anomaly_sum = movsum(anomaly_without_peaks,[59,0]);
+anomaly_sum = movsum(anomaly_without_peaks,[119,0]);
 tmp = anomaly_sum>1;
 anomaly_sum(tmp) = 1;
 tmp = anomaly_sum>anomalylikelihoodThreshold;
 anomaly_sum(~tmp) = 0;
 
 
-P = addvars(P,anomaly_mean,anomaly_sum,anomaly_tmp,data.anomaly,'NewVariableNames',{'Temporal Mean Score (10 sec)','Temporal Sum Score (1 min)','Scaled Log Likelihood Score','Instant Score'});
+P = addvars(P,anomaly_mean,anomaly_sum,anomaly_tmp,data.anomaly,'NewVariableNames',{'Temporal Mean Score (10 sec)','Temporal Sum Score (2 min)','Scaled Log Likelihood Score','Instant Score'});
 
 %P = addvars(P,data.pred1,data.pred5,anomaly_tmp,data.anomaly,'NewVariableNames',{'Pred1','Pred5','AnomalyLikelihood','AnomalyScore'});
 end

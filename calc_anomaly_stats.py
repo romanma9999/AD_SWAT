@@ -2,23 +2,27 @@ import sys
 import swat_utils
 import argparse
 import pandas as pd
-import numpy as np
+import xlsxwriter
+import xlrd
 
 parser = argparse.ArgumentParser(description='runtime configuration for HTM anomaly statistics on SWAT')
 parser.add_argument('--stage_name', '-sn', metavar='STAGE_NAME', default='P1', choices=['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], type=str.upper)
 parser.add_argument('--channel_name', '-cn', metavar='CHANNEL_NAME',type=str)
 parser.add_argument('--batch_channel_names', '-bcn', metavar='BATCH_CHANNEL_NAMES',default = "",type=str)
+parser.add_argument('--batch_file_names', '-bfn', metavar='BATCH_FILE_NAMES',default = "",type=str)
 parser.add_argument('--freeze_type', '-ft', default='off', choices=['off', 'during_training', 'end_training'], type=str.lower)
 parser.add_argument('--learn_type', '-lt', default='always', choices=['always', 'train_only'], type=str.lower)
 parser.add_argument('--prefix', default="", type=str.lower)
 parser.add_argument('--output_file_path', default="./HTM_results/", type=str)
-parser.add_argument('--raw_threshold', '-rth', default=0.6, type=float, help="raw anomaly score threshold")
+parser.add_argument('--raw_threshold', '-rth', default=0.3, type=float, help="raw anomaly score threshold")
 parser.add_argument('--logl_threshold', '-lglth', default=0.6, type=float, help="log likelihood anomaly score threshold")
 parser.add_argument('--mean_window', '-rw', default=9, type=int, help="moving mean anomaly score window")
 parser.add_argument('--mean_threshold', '-mth', default=0.6, type=float, help="moving mean anomaly score threshold")
 parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
 parser.add_argument('--training_count', '-tc', default=414000, type=int, help="training points count")
+parser.add_argument('--excel_filename', '-excel', default="swat_htm_results", type=str)
+
 
 def process_score(labels,scores,score_name,threshold,output_path,file_prefix):
   anomaly_score_output_path = ''.join([output_path, file_prefix, f'_{score_name}_anomaly_score.pred'])
@@ -69,6 +73,7 @@ def unify_stats(stats):
   PR = swat_utils.precision(TP, FP)
   RE = swat_utils.recall(TP, FN)
 
+
   stats = {}
   stats['TP'] = TP
   stats['FP'] = FP
@@ -94,11 +99,10 @@ def get_key_with_max_F1(stats):
 
   return max_key
 
-def get_channel_stats(args,channel_name):
+def get_channel_stats(args,channel_name,input_prefix,label_prefix):
   print(f'process {channel_name}.')
-  file_prefix = swat_utils.get_file_prefix(args, args.channel_name)
-  input_filepath = ''.join([args.output_file_path, file_prefix, '_res.csv'])
-  label_filepath = ''.join([args.output_file_path, file_prefix, '_attack.real'])
+  input_filepath = ''.join([args.output_file_path, input_prefix, '_res.csv'])
+  label_filepath = ''.join([args.output_file_path, label_prefix, '_attack.real'])
 
   print("read HTM results data..")
   dl = pd.read_csv(label_filepath, header=None)
@@ -111,43 +115,105 @@ def get_channel_stats(args,channel_name):
   sum_scores = df.iloc[args.training_count:, 3].rolling(args.sum_window, min_periods=1, center=False).sum()
   print("process anomaly scores...")
   stats = {}
-  stats['raw'] = process_score(labels, raw_scores, 'raw', args.raw_threshold, args.output_file_path, file_prefix)
-  stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, file_prefix)
-  stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, file_prefix)
-  stats['sum'] = process_score(labels, sum_scores, 'sum', args.sum_threshold, args.output_file_path, file_prefix)
+  stats['raw'] = process_score(labels, raw_scores, 'raw', args.raw_threshold, args.output_file_path, input_prefix)
+  stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, input_prefix)
+  stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, input_prefix)
+  stats['sum'] = process_score(labels, sum_scores, 'sum', args.sum_threshold, args.output_file_path, input_prefix)
 
   max_stats = {}
   max_key = get_key_with_max_F1(stats)
   max_stats[max_key] = stats.pop(max_key)
+
   print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
   max_key = get_key_with_max_F1(stats)
   max_stats[max_key] = stats.pop(max_key)
+
   print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
+  max_stats[channel_name] = unify_stats(max_stats)
 
-  total_stats = unify_stats(max_stats)
+  return max_stats
 
-  for key, value in max_stats.items():
-    print(f'{key:5}:{value}')
+def write_stats_to_excel(worksheet, raw, stats,format):
+  for idx, (key,value) in enumerate(stats.items()):
+    if type(value) is list:
+      val = str(value)
+      worksheet.write(raw, idx+1, val,format)
+      worksheet.set_column(idx+1, idx+1, len(val))
+    else:
+      worksheet.write(raw,idx+1, value,format)
 
-  return total_stats
+  return
+
+def save_to_excel(filename, stats):
+  workbook = open_file_for_update('swat_htm_results.xlsx')
+  worksheet = workbook.add_worksheet(args.stage_name)
+  bold = workbook.add_format({'bold': True})
+  format_head = workbook.add_format({'align': 'center'})
+  format_head.set_bold()
+  format_cells = workbook.add_format({'align': 'center'})
+
+  first = True
+  idx_channel = 1
+  for _,(_,s) in enumerate(stats.items()):
+    for (channel_name, channel) in s.items():
+      worksheet.write(idx_channel, 0, channel_name,bold)
+      write_stats_to_excel(worksheet, idx_channel, channel, format_cells)
+      idx_channel += 1
+      # headings
+      if first:
+        first = False
+        worksheet.set_column(0, 0, 8)
+        for idx, key in enumerate(channel):
+            worksheet.write(0, idx + 1, key,format_head)
+            worksheet.set_column(idx+1, idx+1, max(8, len(key)+1))
+
+  workbook.close()
+
+  return
+
+
+def open_file_for_update(filename):
+  workbook = xlsxwriter.Workbook(filename)
+  wbRD  = xlrd.open_workbook(filename)
+  sheets = wbRD.sheets()
+  # run through the sheets and store sheets in workbook
+  # this still doesn't write to the file yet
+  for sheet in sheets: # write data from old file
+      newSheet = workbook.add_worksheet(sheet.name)
+      for row in range(sheet.nrows):
+          for col in range(sheet.ncols):
+              newSheet.write(row, col, sheet.cell(row, col).value)
+
+  return workbook
 
 def main(args):
+
   if len(args.batch_channel_names) != 0:
     channels_list = [x for x in args.batch_channel_names.split(',')]
+    channels_filenames_list = [x for x in args.batch_file_names.split(',')]
   else:
     channels_list = [args.channel_name]
+    channels_filenames_list = [swat_utils.get_file_prefix(args, args.channel_name)]
 
+  first = True
   stats = {}
-  for channel_name in channels_list:
+  channel_stats = {}
+  for channel_name,file_prefix in zip(channels_list,channels_filenames_list):
     args.channel_name = channel_name
-    stats[channel_name] = get_channel_stats(args,channel_name)
+    if first:
+      label_prefix = swat_utils.get_file_prefix(args, args.channel_name)
+      first = False
+    stats[channel_name] = get_channel_stats(args,channel_name,file_prefix,label_prefix)
+    channel_stats[channel_name] = stats[channel_name][channel_name]
 
-  total_stats = unify_stats(stats)
-  for key, value in stats.items():
-    print(f'{key:5}:{value}')
+  stats[args.stage_name] = {args.stage_name: unify_stats(channel_stats)}
+  del stats[args.stage_name][args.stage_name]['fp_array']
 
-  del total_stats['fp_array']
-  print(f'{args.stage_name:5}:{total_stats}')
+  for _, s in stats.items():
+    for key, value in s.items():
+      print(f'{key:5}:{value}')
+
+  save_to_excel(args.excel_filename,stats)
 
   return
 
@@ -183,9 +249,13 @@ if __name__ == "__main__":
     sys.argv = ['calc_anomaly_stats.py',
                 '--stage_name', 'P1',
                 '-bcn', 'LIT101,P102',
+                '-bfn','P1_LIT101_learn_always_freeze_off,P1_P102_learn_train_only_freeze_off',
                 '--freeze_type', 'off',
                 '--learn_type', 'always',
                 '--raw_threshold', '0.7']
+
+
+
 
     args = parser.parse_args()
     print(args)

@@ -92,22 +92,23 @@ A(40).e ='01/2/2016 11:56:38';
 A(41).s = '01/2/2016 13:13:02';% [3] SS, trivial min/max
 A(41).e = '01/2/2016 13:40:56';
 PA_idx = [];
+%removed 28 from all..
  switch PID
          case 1
-             PA_idx = [1 2 3                                            21                      26       28 30           33 34 35 36]; % not min/max : 3?, 21, 26 (eventually),28(long constant value), 30(value freeze then minmax), 33(value freeze then minmax), 35
+             PA_idx = [1 2 3                                            21                      26       30           33 34 35 36]; % not min/max : 3?, 21, 26 (eventually),28(long constant value), 30(value freeze then minmax), 33(value freeze then minmax), 35
          case 2
              %  FIT201(2,26,28,30), AIT202(6,28),P203(24,28)
-            PA_idx = [   2     6                                                        24      26       28 30]; % not min/max :28(long constant value)
+            PA_idx = [   2     6                                                        24      26       30]; % not min/max :28(long constant value)
          case 3
              %LIT301(7,16,26,26,32,41),DPIT301(8,23,27,28),MV301(17,28)
-            PA_idx = [             7 8            16 17                       23           26  27 28           32                                              41];  % not min/max : 17, 26 (constant value), 27, 28(long constant value)
+            PA_idx = [             7 8            16 17                       23           26  27           32                                              41];  % not min/max : 17, 26 (constant value), 27, 28(long constant value)
          case 4
              %LIT401(8,17,23,25,27,28, 31) ,AIT402(10,11,22,28,38,40),FIT401(10,11,22,37,39,40)
-            PA_idx = [                8 10 11       17                 22 23      25       27 28       31                             37 38 39 40];  % not min/max :  8(eventually) , 17(eventually), 23(eventually),25, 27?, 28(long constant value)
+            PA_idx = [                8 10 11       17                 22 23      25       27       31                             37 38 39 40];  % not min/max :  8(eventually) , 17(eventually), 23(eventually),25, 27?, 28(long constant value)
          case 5
-            PA_idx = [                   10 11            19 20       22                            28                                        37 38 39 40]; % not min/max : 19 (value fixed), 28(long constant value), 39 (value fixed)
+            PA_idx = [                   10 11            19 20       22                                                                   37 38 39 40]; % not min/max : 19 (value fixed), 28(long constant value), 39 (value fixed)
          case 6
-            PA_idx = [                8                                             23                      28];  % not min/max : 8,23 , 28(long constant value)
+            PA_idx = [                8                                             23                      ];  % not min/max : 8,23 , 28(long constant value)
  end
 
 end
