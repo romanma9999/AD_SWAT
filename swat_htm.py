@@ -317,14 +317,13 @@ def runner(parameters,args):
     return
 
 if __name__ == "__main__":
-    # sys.argv = ['swat_htm.py',
-    #             '--stage_name', 'P1',
-    #             '--channel_name', 'P102',
-    #             '--freeze_type', 'off',
-    #             '--learn_type', 'always',
-    #             '--verbose',
-    #             '--sdr_size', '10',
-    #             '-ctype','1']
+    sys.argv = ['swat_htm.py',
+                '--stage_name', 'P3',
+                '--channel_name', 'DPIT301',
+                '--freeze_type', 'off',
+                '--learn_type', 'always',
+                '--verbose',
+                '-ctype','0']
 
     args = parser.parse_args()
     print(args)

@@ -4,12 +4,13 @@ import argparse
 import pandas as pd
 import xlsxwriter
 import xlrd
+from os.path import exists
+import copy
 
 parser = argparse.ArgumentParser(description='runtime configuration for HTM anomaly statistics on SWAT')
 parser.add_argument('--stage_name', '-sn', metavar='STAGE_NAME', default='P1', choices=['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], type=str.upper)
 parser.add_argument('--channel_name', '-cn', metavar='CHANNEL_NAME',type=str)
 parser.add_argument('--batch_channel_names', '-bcn', metavar='BATCH_CHANNEL_NAMES',default = "",type=str)
-parser.add_argument('--batch_file_names', '-bfn', metavar='BATCH_FILE_NAMES',default = "",type=str)
 parser.add_argument('--freeze_type', '-ft', default='off', choices=['off', 'during_training', 'end_training'], type=str.lower)
 parser.add_argument('--learn_type', '-lt', default='always', choices=['always', 'train_only'], type=str.lower)
 parser.add_argument('--prefix', default="", type=str.lower)
@@ -21,8 +22,11 @@ parser.add_argument('--mean_threshold', '-mth', default=0.6, type=float, help="m
 parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
 parser.add_argument('--training_count', '-tc', default=414000, type=int, help="training points count")
-parser.add_argument('--excel_filename', '-excel', default="swat_htm_results", type=str)
-
+parser.add_argument('--excel_filename', '-efn', default="swat_htm_results.xlsx", type=str)
+parser.add_argument('--excel_sheet_name', '-esn', default="P1", type=str)
+parser.add_argument('--verbose', default=False, action='store_true')
+parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
+parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
 
 def process_score(labels,scores,score_name,threshold,output_path,file_prefix):
   anomaly_score_output_path = ''.join([output_path, file_prefix, f'_{score_name}_anomaly_score.pred'])
@@ -145,18 +149,18 @@ def write_stats_to_excel(worksheet, raw, stats,format):
   return
 
 def save_to_excel(filename, stats):
-  workbook = open_file_for_update('swat_htm_results.xlsx')
-  worksheet = workbook.add_worksheet(args.stage_name)
-  bold = workbook.add_format({'bold': True})
+  workbook = xlsxwriter.Workbook(args.excel_filename)
+  if exists(args.excel_filename):
+    open_file_for_update(args.excel_filename,workbook,args.excel_sheet_name)
+  worksheet = workbook.add_worksheet(args.excel_sheet_name)
   format_head = workbook.add_format({'align': 'center'})
-  format_head.set_bold()
   format_cells = workbook.add_format({'align': 'center'})
 
   first = True
   idx_channel = 1
   for _,(_,s) in enumerate(stats.items()):
     for (channel_name, channel) in s.items():
-      worksheet.write(idx_channel, 0, channel_name,bold)
+      worksheet.write(idx_channel, 0, channel_name,format_head)
       write_stats_to_excel(worksheet, idx_channel, channel, format_cells)
       idx_channel += 1
       # headings
@@ -172,25 +176,56 @@ def save_to_excel(filename, stats):
   return
 
 
-def open_file_for_update(filename):
-  workbook = xlsxwriter.Workbook(filename)
+def open_file_for_update(filename,workbook,new_sheet_name):
+
+  format_cells = workbook.add_format({'align': 'center'})
   wbRD  = xlrd.open_workbook(filename)
   sheets = wbRD.sheets()
   # run through the sheets and store sheets in workbook
   # this still doesn't write to the file yet
   for sheet in sheets: # write data from old file
-      newSheet = workbook.add_worksheet(sheet.name)
-      for row in range(sheet.nrows):
-          for col in range(sheet.ncols):
-              newSheet.write(row, col, sheet.cell(row, col).value)
+    if sheet.name == new_sheet_name: #skip copy of sheet we will add
+      continue
+    newSheet = workbook.add_worksheet(sheet.name)
+    for row in range(sheet.nrows):
+        for col in range(sheet.ncols):
+            v = sheet.cell(row, col).value
+            newSheet.write(row, col, v, format_cells)
+            if row == 0:
+              newSheet.set_column(col, col, max(8, len(v) + 1))
+            elif type(v) is str and v != "":
+              newSheet.set_column(col, col, max(8, len(v) + 1))
 
-  return workbook
+  return
+
+def get_channel_filenames(args,channels_list):
+  # args_tmp = copy.deepcopy(args)
+  run_file = open(f'run_{args.stage_name}.bat', 'r')
+  lines = run_file.readlines()
+  channel_filenames_list = []
+  for channel_name in channels_list:
+    for line in lines:
+      line = line.rstrip(' \n')
+      if channel_name in line:
+        line_args = [x for x in line.split(' ')]
+        line_args = line_args[2:]
+        args_tmp = parser.parse_args(line_args)
+        if args_tmp.channel_name != channel_name:
+          continue
+
+        fn = swat_utils.get_file_prefix(args_tmp, args_tmp.channel_name)
+        print(f'{channel_name}:{fn}')
+        channel_filenames_list.append(fn)
+        break
+
+  run_file.close()
+  return channel_filenames_list
 
 def main(args):
 
   if len(args.batch_channel_names) != 0:
     channels_list = [x for x in args.batch_channel_names.split(',')]
-    channels_filenames_list = [x for x in args.batch_file_names.split(',')]
+    channels_filenames_list = get_channel_filenames(args, channels_list)
   else:
     channels_list = [args.channel_name]
     channels_filenames_list = [swat_utils.get_file_prefix(args, args.channel_name)]
@@ -249,7 +284,6 @@ if __name__ == "__main__":
     sys.argv = ['calc_anomaly_stats.py',
                 '--stage_name', 'P1',
                 '-bcn', 'LIT101,P102',
-                '-bfn','P1_LIT101_learn_always_freeze_off,P1_P102_learn_train_only_freeze_off',
                 '--freeze_type', 'off',
                 '--learn_type', 'always',
                 '--raw_threshold', '0.7']
