@@ -158,6 +158,7 @@ def runner(parameters,args):
         sdr_sparsity = float(V1EncoderParams.activeBits/sdr_size)
         print(f'active bits: {V1EncoderParams.activeBits}')
 
+    print(f'min: {V1EncoderParams.minimum}, max: {V1EncoderParams.maximum}')
     V1Encoder = ScalarEncoder(V1EncoderParams)
 
     V1EncodingSize = V1Encoder.size
@@ -317,13 +318,13 @@ def runner(parameters,args):
     return
 
 if __name__ == "__main__":
-    sys.argv = ['swat_htm.py',
-                '--stage_name', 'P3',
-                '--channel_name', 'DPIT301',
-                '--freeze_type', 'off',
-                '--learn_type', 'always',
-                '--verbose',
-                '-ctype','0']
+    # sys.argv = ['swat_htm.py',
+    #             '--stage_name', 'P3',
+    #             '--channel_name', 'DPIT301',
+    #             '--freeze_type', 'off',
+    #             '--learn_type', 'always',
+    #             '--verbose',
+    #             '-ctype','0']
 
     args = parser.parse_args()
     print(args)

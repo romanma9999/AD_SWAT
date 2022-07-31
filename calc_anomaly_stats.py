@@ -22,8 +22,9 @@ parser.add_argument('--mean_threshold', '-mth', default=0.6, type=float, help="m
 parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
 parser.add_argument('--training_count', '-tc', default=414000, type=int, help="training points count")
-parser.add_argument('--excel_filename', '-efn', default="swat_htm_results.xlsx", type=str)
+parser.add_argument('--excel_filename', '-efn', default="swat_htm_results", type=str)
 parser.add_argument('--excel_sheet_name', '-esn', default="P1", type=str)
+parser.add_argument('--output_filename_addon', '-ofa', default="", type=str)
 parser.add_argument('--verbose', default=False, action='store_true')
 parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
 parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
@@ -149,9 +150,10 @@ def write_stats_to_excel(worksheet, raw, stats,format):
   return
 
 def save_to_excel(filename, stats):
-  workbook = xlsxwriter.Workbook(args.excel_filename)
-  if exists(args.excel_filename):
-    open_file_for_update(args.excel_filename,workbook,args.excel_sheet_name)
+  filename = f'{filename}{args.output_filename_addon}.xlsx'
+  workbook = xlsxwriter.Workbook(filename)
+  if exists(filename):
+    open_file_for_update(filename,workbook,args.excel_sheet_name)
   worksheet = workbook.add_worksheet(args.excel_sheet_name)
   format_head = workbook.add_format({'align': 'center'})
   format_cells = workbook.add_format({'align': 'center'})
@@ -200,7 +202,7 @@ def open_file_for_update(filename,workbook,new_sheet_name):
 
 def get_channel_filenames(args,channels_list):
   # args_tmp = copy.deepcopy(args)
-  run_file = open(f'run_{args.stage_name}.bat', 'r')
+  run_file = open(f'run{args.output_filename_addon}.bat', 'r')
   lines = run_file.readlines()
   channel_filenames_list = []
   for channel_name in channels_list:
@@ -208,6 +210,8 @@ def get_channel_filenames(args,channels_list):
       line = line.rstrip(' \n')
       if channel_name in line:
         line_args = [x for x in line.split(' ')]
+        if line_args[1] != 'swat_htm.py':
+          continue
         line_args = line_args[2:]
         args_tmp = parser.parse_args(line_args)
         if args_tmp.channel_name != channel_name:
@@ -281,12 +285,12 @@ if __name__ == "__main__":
 
     # test_unify_detection_delay_list()
 
-    sys.argv = ['calc_anomaly_stats.py',
-                '--stage_name', 'P1',
-                '-bcn', 'LIT101,P102',
-                '--freeze_type', 'off',
-                '--learn_type', 'always',
-                '--raw_threshold', '0.7']
+    # sys.argv = ['calc_anomaly_stats.py',
+    #             '--stage_name', 'P1',
+    #             '-bcn', 'LIT101,P102',
+    #             '--freeze_type', 'off',
+    #             '--learn_type', 'always',
+    #             '--raw_threshold', '0.7']
 
 
 
