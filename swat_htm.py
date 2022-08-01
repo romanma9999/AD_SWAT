@@ -24,6 +24,7 @@ parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=
 parser.add_argument('--freeze_type', '-ft', default='off', choices=['off', 'during_training', 'end_training'], type=str.lower)
 parser.add_argument('--learn_type', '-lt', default='always', choices=['always', 'train_only'], type=str.lower)
 parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
+parser.add_argument('--connection_segments_gap', '-csg', default=1, type=int)
 parser.add_argument('--sdr_sparsity', '-sparsity', metavar='SDR_SPARCITY', default=0.02, type=float)
 parser.add_argument('--custom_min', '-cmin', metavar='MIN_VAL', default=2, type=int)
 parser.add_argument('--custom_max', '-cmax', metavar='MAX_VAL', default=3, type=int)
@@ -34,7 +35,7 @@ parser.add_argument('--input_file_path', default="./HTM_input/", type=str)
 parser.add_argument('--output_file_path', default="./HTM_results/", type=str)
 parser.add_argument('--override_parameters', '-op', default="", type=str,
                     help="override parameter values, group_name,var_name,val,res/../.. ,param value = val/res")
-
+parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
 
 default_parameters = {
     'enc': {
@@ -56,6 +57,7 @@ default_parameters = {
            'minThreshold': 3,
            'synPermConnected': 0.13999999999999999,
            'permanenceDec': 0.001,
+            'cellNewConnectionMaxSegmentsGap': 0,
            'permanenceInc': 0.1},
     'anomaly': {'period': 1000},
 }
@@ -84,6 +86,7 @@ def main(args):
     parameters = default_parameters
     parameters['enc']['size'] = args.sdr_size
     parameters['enc']['sparsity'] = args.sdr_sparsity
+    parameters['tm']['cellNewConnectionMaxSegmentsGap'] = args.connection_segments_gap
     parameters['runtime_config'] = runtime_config
 
     if len(args.override_parameters) > 0:
@@ -195,6 +198,7 @@ def runner(parameters,args):
         maxNewSynapseCount        = int(sdr_sparsity*sdr_size),
         permanenceIncrement       = tmParams["permanenceInc"],
         permanenceDecrement       = tmParams["permanenceDec"],
+        cellNewConnectionMaxSegmentsGap=tmParams["cellNewConnectionMaxSegmentsGap"],
         predictedSegmentDecrement = 0.0,
         maxSegmentsPerCell        = tmParams["maxSegmentsPerCell"],
         maxSynapsesPerSegment     = tmParams["maxSynapsesPerSegment"]
@@ -215,7 +219,7 @@ def runner(parameters,args):
     v1_prev = 2.4
     max_const_duration = 0
     current_const_duration = 0
-    prev_value = 0
+    prev_encoding = 0
     test_count = 0
     for count, record in enumerate(records):
 
@@ -252,13 +256,25 @@ def runner(parameters,args):
             tm.make_current_network_permanent()
             print('training done, freeze network..')
 
-        tm.compute(encoding, learn=learn, permanent=permanent)
+        if args.encoding_type == 'raw':
+            tm.compute(encoding, learn=learn, permanent=permanent)
+            tm_active_cells = tm.getActiveCells()
+            tm_info.addData( tm_active_cells.flatten() )
+            anomaly[count] = tm.anomaly
+            anomalyProb[count] = anomaly_history.compute(tm.anomaly)
 
-        tm_active_cells = tm.getActiveCells()
-        tm_info.addData( tm_active_cells.flatten() )
+        if args.encoding_type == 'diff':
+            if count == 0 or prev_encoding != encoding:
+                tm.compute(encoding, learn=learn, permanent=permanent)
+                tm_active_cells = tm.getActiveCells()
+                tm_info.addData(tm_active_cells.flatten())
+                anomaly[count] = tm.anomaly
+                anomalyProb[count] = anomaly_history.compute(tm.anomaly)
+            else:
+                anomaly[count] = 0
+                anomalyProb[count] = 0
 
-        anomaly[count] = tm.anomaly
-        anomalyProb[count] = anomaly_history.compute(tm.anomaly)
+            prev_encoding = encoding
 
         # if count == 1:
         #     prev_value = v1_val;

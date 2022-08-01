@@ -26,6 +26,7 @@ parser.add_argument('--excel_filename', '-efn', default="swat_htm_results", type
 parser.add_argument('--excel_sheet_name', '-esn', default="P1", type=str)
 parser.add_argument('--output_filename_addon', '-ofa', default="", type=str)
 parser.add_argument('--verbose', default=False, action='store_true')
+parser.add_argument('--training_score', default=False, action='store_true')
 parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
 parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
 
@@ -56,7 +57,7 @@ def unify_detection_delay_list(l_count,stats):
 
   return [x for x in detection_delay if x != -1]
 
-def unify_stats(stats):
+def unify_stats(stats,grace_time = 60):
   TP_detected_labels = set()
   first = True
   fpa = []
@@ -69,7 +70,31 @@ def unify_stats(stats):
       fpa = [x|y for x,y in zip(fpa,s['fp_array'])]
     del s['fp_array']
 
-  FP = sum([1 for idx, x in enumerate(fpa[:-1]) if fpa[idx] == 0 and fpa[idx+1] == 1])
+  N = len(fpa)
+  FP = 0
+  FP_arr = [0] * N
+  s_now = False
+  # FP_start_idx = 0
+  for idx, score in enumerate(fpa):
+    s_prev = s_now
+    s_now = True if score == 1 else False
+    if s_now and s_prev == False:
+      FP_start_idx = idx
+
+    s_marked = False
+    if (s_prev and s_now == False) or (s_now and idx == N-1):
+      max_hist = min(FP_start_idx, grace_time)
+      for i in range(max_hist):
+        if FP_arr[FP_start_idx - i] == 1:
+          s_marked = True
+          break
+
+      if s_marked == False:
+        FP += 1
+        FP_arr[FP_start_idx:idx] = [1]*(idx-FP_start_idx)
+        if s_now and idx == N-1:
+          FP_arr[-1] = 1
+
   l_count = next(iter(stats.values()))['LabelsCount']
   TP_detection_delay = unify_detection_delay_list(l_count, stats)
 
@@ -88,7 +113,7 @@ def unify_stats(stats):
   stats['F1'] = swat_utils.F1(PR, RE)
   stats['detected_labels'] = list(TP_detected_labels)
   stats['detection_delay'] = TP_detection_delay
-  stats['fp_array'] = fpa
+  stats['fp_array'] = FP_arr
   stats['LabelsCount'] = l_count
 
   return stats
@@ -111,19 +136,30 @@ def get_channel_stats(args,channel_name,input_prefix,label_prefix):
 
   print("read HTM results data..")
   dl = pd.read_csv(label_filepath, header=None)
-  labels = dl.iloc[:, 0]
+  n_grace = int(0.1 * args.training_count)
+  if args.training_score:
+    labels = [0]*(args.training_count - n_grace)
+  else:
+    labels = dl.iloc[:, 0]
 
   df = pd.read_csv(input_filepath)
-  raw_scores = df.iloc[args.training_count:, 3]
+  if args.training_score:
+    raw_scores = df.iloc[n_grace:args.training_count, 3]
+    sum_scores = df.iloc[n_grace:args.training_count, 3].rolling(args.sum_window, min_periods=1, center=False).sum()
+  else:
+    raw_scores = df.iloc[args.training_count:, 3]
+    sum_scores = df.iloc[args.training_count:, 3].rolling(args.sum_window, min_periods=1, center=False).sum()
+
   logl_scores = df.iloc[args.training_count:, 4]
   mean_scores = df.iloc[args.training_count:, 3].rolling(args.mean_window, min_periods=1, center=False).mean()
-  sum_scores = df.iloc[args.training_count:, 3].rolling(args.sum_window, min_periods=1, center=False).sum()
+
   print("process anomaly scores...")
   stats = {}
   stats['raw'] = process_score(labels, raw_scores, 'raw', args.raw_threshold, args.output_file_path, input_prefix)
-  stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, input_prefix)
-  stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, input_prefix)
   stats['sum'] = process_score(labels, sum_scores, 'sum', args.sum_threshold, args.output_file_path, input_prefix)
+  # stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, input_prefix)
+  # stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, input_prefix)
+
 
   max_stats = {}
   max_key = get_key_with_max_F1(stats)

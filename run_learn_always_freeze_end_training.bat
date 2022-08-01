@@ -43,9 +43,9 @@ python swat_htm.py --verbose -sn P5 -cn FIT503 -ctype 0 -ft during_training -lt 
 python swat_htm.py --verbose -sn P5 -cn FIT504 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P5 -cn P501 -ctype 1 -ft during_training -lt always --sdr_size 60
 python swat_htm.py --verbose -sn P5 -cn PIT501 -ctype 0 -ft during_training -lt always 
-python swat_htm.py --verbose -sn P5 -cn PIT502 -ctype 0 -ft during_training -lt always 
+:: python swat_htm.py --verbose -sn P5 -cn PIT502 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P5 -cn PIT503 -ctype 0 -ft during_training -lt always 
-python calc_anomaly_stats.py -sn P5 -esn P5 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn AIT501,AIT502,AIT503,AIT504,FIT501,FIT502,FIT503,FIT504,P501,PIT501,PIT502,PIT503
+python calc_anomaly_stats.py -sn P5 -esn P5 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn AIT501,AIT502,AIT503,AIT504,FIT501,FIT502,FIT503,FIT504,P501,PIT501,PIT503
 
 python swat_htm.py --verbose -sn P6 -cn FIT601 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P6 -cn P602 -ctype 1 -ft during_training -lt always --sdr_size 60
