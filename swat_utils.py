@@ -58,7 +58,7 @@ def anomaly_score(data, threshold):
   return res
 
 
-def calc_anomaly_stats(scores, labels):
+def calc_anomaly_stats(scores, labels, grace_time = 60):
   l_count = 0
   s_false_count = 0
   TP_detected_labels = []
@@ -92,7 +92,13 @@ def calc_anomaly_stats(scores, labels):
   l_marked = False
   in_label = False
   s_marked = False
+  start = True
   for idx, (score,label) in enumerate(zip(scores,labels)):
+    #skip score tail from training..
+    if start and label == 0 and score == 1:
+      continue
+    start = False
+
     l_prev = l_now
     l_now = True if label == 1 else False
     s_prev = s_now
@@ -120,6 +126,13 @@ def calc_anomaly_stats(scores, labels):
       s_marked = True
 
     if (s_prev and s_now == False) or (s_now and idx == N-1):
+      if s_marked == False:
+        max_hist = min(FP_start_idx, grace_time)
+        for i in range(max_hist):
+          if FP_arr[FP_start_idx - i] == 1 or labels[FP_start_idx - i] == 1:
+            s_marked = True
+            break
+
       if s_marked == False:
         s_false_count = s_false_count + 1
         FP_arr[FP_start_idx:idx] = [1]*(idx-FP_start_idx)

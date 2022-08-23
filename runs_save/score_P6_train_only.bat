@@ -1,0 +1,1 @@
+python calc_anomaly_stats.py -sn P6 -esn P6 -ft off -lt train_only -ofa _train_only -bcn FIT601,P602 

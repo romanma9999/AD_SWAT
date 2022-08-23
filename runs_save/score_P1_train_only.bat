@@ -1,0 +1,1 @@
+python calc_anomaly_stats.py -sn P1 -esn P1 -ft off -lt train_only -ofa _train_only -bcn LIT101,P101,P102 

@@ -1,0 +1,1 @@
+python calc_anomaly_stats.py -sn P2 -esn P2 -ft during_training -lt always -ofa _during_training_always -bcn AIT201,AIT202,AIT203,FIT201,MV201,P201,P203,P204,P205
