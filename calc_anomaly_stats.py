@@ -157,22 +157,23 @@ def get_channel_stats(args,channel_name,input_prefix,label_prefix):
   stats = {}
   stats['raw'] = process_score(labels, raw_scores, 'raw', args.raw_threshold, args.output_file_path, input_prefix)
   stats['sum'] = process_score(labels, sum_scores, 'sum', args.sum_threshold, args.output_file_path, input_prefix)
-  # stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, input_prefix)
-  # stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, input_prefix)
+  stats['logl'] = process_score(labels, logl_scores, 'logl', args.logl_threshold, args.output_file_path, input_prefix)
+  stats['mean'] = process_score(labels, mean_scores, 'mean', args.mean_threshold, args.output_file_path, input_prefix)
+  stats[channel_name] = stats[get_key_with_max_F1(stats)]
 
-
-  max_stats = {}
-  max_key = get_key_with_max_F1(stats)
-  max_stats[max_key] = stats.pop(max_key)
-
-  print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
-  max_key = get_key_with_max_F1(stats)
-  max_stats[max_key] = stats.pop(max_key)
-
-  print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
-  max_stats[channel_name] = unify_stats(max_stats)
-
-  return max_stats
+  # max_stats = {}
+  # max_key = get_key_with_max_F1(stats)
+  # max_stats[max_key] = stats.pop(max_key)
+  #
+  # print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
+  # max_key = get_key_with_max_F1(stats)
+  # max_stats[max_key] = stats.pop(max_key)
+  #
+  # print(f'{max_key} score selected, F1 = {max_stats[max_key]["F1"]}')
+  # max_stats[channel_name] = unify_stats(max_stats)
+  #
+  # return max_stats
+  return stats
 
 def write_stats_to_excel(worksheet, raw, stats,format):
   for idx, (key,value) in enumerate(stats.items()):
@@ -286,6 +287,8 @@ def main(args):
 
   for _, s in stats.items():
     for key, value in s.items():
+      if 'fp_array' in value:
+        del value['fp_array']
       print(f'{key:5}:{value}')
 
   save_to_excel(args.excel_filename,stats)

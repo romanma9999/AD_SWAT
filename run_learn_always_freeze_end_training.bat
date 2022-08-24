@@ -1,11 +1,8 @@
 python swat_htm.py --verbose -sn P1 -cn LIT101 -ctype 0 -ft during_training -lt always 
-python swat_htm.py --verbose -sn P1 -cn P101 -ctype 1 -ft during_training -lt always --sdr_size 60
 python swat_htm.py --verbose -sn P1 -cn P102 -ctype 1 -ft during_training -lt always --sdr_size 60
-python calc_anomaly_stats.py -sn P1 -esn P1 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn LIT101,P101,P102 
+python calc_anomaly_stats.py -sn P1 -esn P1 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn LIT101,P102 
 
-python swat_htm.py --verbose -sn P2 -cn AIT201 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P2 -cn AIT202 -ctype 0 -ft during_training -lt always 
-python swat_htm.py --verbose -sn P2 -cn AIT203 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P2 -cn FIT201 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P2 -cn MV201 -ctype 1 -ft during_training -lt always --sdr_size 60
 python swat_htm.py --verbose -sn P2 -cn P201 -ctype 1 -ft during_training -lt always --sdr_size 60
@@ -13,7 +10,7 @@ python swat_htm.py --verbose -sn P2 -cn P203 -ctype 1 -ft during_training -lt al
 python swat_htm.py --verbose -sn P2 -cn P204 -ctype 1 -ft during_training -lt always --sdr_size 60
 python swat_htm.py --verbose -sn P2 -cn P205 -ctype 1 -ft during_training -lt always --sdr_size 60
 python swat_htm.py --verbose -sn P2 -cn P206 -ctype 1 -ft during_training -lt always --sdr_size 60
-python calc_anomaly_stats.py -sn P2 -esn P2 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn AIT201,AIT202,AIT203,FIT201,MV201,P201,P203,P204,P205
+python calc_anomaly_stats.py -sn P2 -esn P2 -ft during_training -lt always -ofa _learn_always_freeze_end_training -bcn AIT202,FIT201,MV201,P201,P203,P204,P205
 
 python swat_htm.py --verbose -sn P3 -cn DPIT301 -ctype 0 -ft during_training -lt always 
 python swat_htm.py --verbose -sn P3 -cn FIT301 -ctype 0 -ft during_training -lt always 

@@ -16,6 +16,8 @@ from htm.bindings.algorithms import SpatialPooler
 from htm.bindings.algorithms import TemporalMemory
 from htm.algorithms.anomaly_likelihood import AnomalyLikelihood
 from htm.bindings.algorithms import Predictor
+import collections
+import white_black_list
 
 parser = argparse.ArgumentParser(description='runtime configuration for HTM anomaly detection on SWAT')
 parser.add_argument('--stage_name', '-sn', metavar='STAGE_NAME', default='P1', choices=['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], type=str.upper)
@@ -35,6 +37,7 @@ parser.add_argument('--input_file_path', default="./HTM_input/", type=str)
 parser.add_argument('--output_file_path', default="./HTM_results/", type=str)
 parser.add_argument('--override_parameters', '-op', default="", type=str,
                     help="override parameter values, group_name,var_name,val,res/../.. ,param value = val/res")
+parser.add_argument('--replay_buffer', '-rpb', default=200, type=int)
 parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
 
 default_parameters = {
@@ -140,7 +143,19 @@ def runner(parameters,args):
     sdr_size = parameters["enc"]["size"]
     sdr_sparsity = parameters["enc"]["sparsity"]
 
+    black_list = white_black_list.get_black_list()
+    white_list = white_black_list.get_white_list()
+
     V1PrmName = config['var_name']
+    var_white_list = []
+    var_black_list = []
+    if V1PrmName in white_list.keys():
+        var_white_list = white_list[V1PrmName]
+        print(f'white list {var_white_list}')
+    if V1PrmName in black_list.keys():
+        var_black_list = black_list[V1PrmName]
+    print(f'black list {var_black_list}')
+
     V1EncoderParams = ScalarEncoderParameters()
 
     if config['CustomMinMax'] is True:
@@ -221,11 +236,15 @@ def runner(parameters,args):
     current_const_duration = 0
     prev_encoding = 0
     test_count = 0
+
+    if args.replay_buffer:
+        sdr_rbuffer = collections.deque(maxlen=args.replay_buffer)
+
     for count, record in enumerate(records):
 
         v1_val = float(record[v1_idx])
 
-        if v1_val > V1EncoderParams.minimum and v1_val < V1EncoderParams.maximum:
+        if count == 0:
             v1_prev = v1_val
 
         if v1_val < V1EncoderParams.minimum:
@@ -243,38 +262,72 @@ def runner(parameters,args):
         # Call the encoders to create bit representations for each value.  These are SDR objects.
         encoding = V1Encoder.encode(v1_val)
         enc_info.addData(encoding)
+        if args.replay_buffer:
+            sdr_rbuffer.append(encoding)
 
+        training_period = count < training_count
         learn = True
         if learn_during_training_only:
             learn = count < training_count
 
         permanent = False
         if freeze_during_training:
-            permanent = count < training_count
+            permanent = training_period
 
         if freeze_trained_network and count == training_count:
             tm.make_current_network_permanent()
             print('training done, freeze network..')
 
-        if args.encoding_type == 'raw':
-            tm.compute(encoding, learn=learn, permanent=permanent)
-            tm_active_cells = tm.getActiveCells()
-            tm_info.addData( tm_active_cells.flatten() )
-            anomaly[count] = tm.anomaly
-            anomalyProb[count] = anomaly_history.compute(tm.anomaly)
+        val_is_white = False
+        val_is_black = False
 
+        if not training_period:
+            for vv in var_white_list:
+                if v1_prev == vv[0] and v1_val == vv[1]:
+                    val_is_white = True
+                    break
+
+            for vv in var_black_list:
+                if v1_prev == vv[0] and v1_val == vv[1]:
+                    val_is_black = True
+                    break
+
+        run_tm = False
+        if args.encoding_type == 'raw':
+            run_tm = True
         if args.encoding_type == 'diff':
             if count == 0 or prev_encoding != encoding:
+                run_tm = True
+
+        if run_tm:
+            if val_is_black:
+                tm.compute(encoding, learn=False, permanent=False)
+            else:
                 tm.compute(encoding, learn=learn, permanent=permanent)
-                tm_active_cells = tm.getActiveCells()
-                tm_info.addData(tm_active_cells.flatten())
+
+            tm_active_cells = tm.getActiveCells()
+            tm_info.addData(tm_active_cells.flatten())
+            if val_is_black:
+                print(f'black list: prev_val = {v1_prev}, curr_val = {v1_val}')
+                anomaly[count] = 1.0
+                anomalyProb[count] = 1.0
+            elif val_is_white:
+                print(f'white list: prev_val = {v1_prev}, curr_val = {v1_val}')
+                anomaly[count] = 0.0
+                anomalyProb[count] = 0.0
+            else:
                 anomaly[count] = tm.anomaly
                 anomalyProb[count] = anomaly_history.compute(tm.anomaly)
-            else:
-                anomaly[count] = 0
-                anomalyProb[count] = 0
 
-            prev_encoding = encoding
+            if args.replay_buffer and tm.anomaly:
+                for replay_enc in sdr_rbuffer:
+                    tm.compute(replay_enc, learn=False, permanent=False)
+        else:
+            anomaly[count] = 0
+            anomalyProb[count] = 0
+
+        prev_encoding = encoding
+        v1_prev = v1_val
 
         # if count == 1:
         #     prev_value = v1_val;
@@ -335,12 +388,13 @@ def runner(parameters,args):
 
 if __name__ == "__main__":
     # sys.argv = ['swat_htm.py',
-    #             '--stage_name', 'P3',
-    #             '--channel_name', 'DPIT301',
+    #             '--stage_name', 'P1',
+    #             '--channel_name', 'P102',
     #             '--freeze_type', 'off',
     #             '--learn_type', 'always',
     #             '--verbose',
-    #             '-ctype','0']
+    #             '-ctype','1',
+    #             '--sdr_size','60']
 
     args = parser.parse_args()
     print(args)
