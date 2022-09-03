@@ -1,5 +1,5 @@
 python swat_htm.py --verbose -sn P1 -cn P102 -ctype 1 -ft off -lt always --sdr_size 60
-python swat_htm.py --verbose -sn P1 -cn LIT101 -ctype 0 -ft off -lt always -diff
+python swat_htm.py --verbose -sn P1 -cn LIT101 -ctype 0 -ft off -lt always -diff -sbp -w 1 -size 512
 python calc_anomaly_stats.py -sn P1 -esn P1 -ft off -lt always -ofa _learn_diff -bcn LIT101,P102 
 
 python swat_htm.py --verbose -sn P2 -cn AIT202 -ctype 0 -ft off -lt always -diff
