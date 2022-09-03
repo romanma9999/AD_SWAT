@@ -1,4 +1,5 @@
 import csv
+import pandas
 
 def read_input(input_path, meta_path):
 # read input for running HTM on SWAT
@@ -56,6 +57,20 @@ def anomaly_score(data, threshold):
     res[idx] = 1 if item >= threshold else 0
 
   return res
+
+
+def count_continuous_ones(data):
+  prev_zero = True
+  found = 0
+  for d in data:
+    if d:
+      if prev_zero:
+        prev_zero = False
+        found = found + 1
+    else:
+      prev_zero = True
+
+  return found
 
 
 def calc_anomaly_stats(scores, labels, grace_time = 60):
@@ -259,5 +274,15 @@ def test_calc_anomaly_stats():
   stats = calc_anomaly_stats(s, l)
   print(f'{idx}: {stats}')
 
+def test_count_continuous_ones():
+  a = [0,0,1,0,1,0,1,1,1,0,1,1,0,0,1,0]
+  val = count_continuous_ones(a)
+  print(f'found {val} continuous ones')
+
+
+
 if __name__ == "__main__":
-  test_calc_anomaly_stats()
+  # test_calc_anomaly_stats()
+  test_count_continuous_ones()
+
+

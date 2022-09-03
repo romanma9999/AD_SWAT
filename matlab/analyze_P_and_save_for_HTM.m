@@ -14,7 +14,7 @@ load('swat_nominal.mat');
 
 load('swat_attack.mat');
 [Pa{1},Pa{2},Pa{3},Pa{4},Pa{5},Pa{6}] = parse_swat(swat_attack);
-plot_swat(Pa{1},Pa{2},Pa{3},Pa{4},Pa{5},Pa{6});
+%plot_swat(Pa{1},Pa{2},Pa{3},Pa{4},Pa{5},Pa{6});
 
 
 startTime = '12/23/2015 15:00:00';
@@ -22,6 +22,8 @@ finishTrainingTime = datetime('28/12/2015 9:59:59','InputFormat','dd/MM/uuuu HH:
 for i = 1:6
     p_prepare_for_HTM(Pn{i},Pa{i},startTime, finishTrainingTime,i)
 end
+% i = 2
+% p_prepare_for_HTM(Pn{i},Pa{i},startTime, finishTrainingTime,i)
 clear(vars{:})
 
 

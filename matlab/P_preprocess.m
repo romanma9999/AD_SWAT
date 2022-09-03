@@ -43,18 +43,41 @@ switch PID
 
 %         P = addvars(P,d2,'Before','Anomaly','NewVariableNames',[mstd_name '_LIT101']);
     case 2
-        d1(2:end) = abs(diff(P.AIT201));
         d2(2:end) = abs(diff(P.AIT202));
-        d3(2:end) = abs(diff(P.AIT203));
+        
+%         d = diff(P.FIT201);
+%         maxx = max(d);
+%         minn = min(d);
+%         diff_norm = (d - minn)/(maxx - minn);
+%         diff_norm = diff_norm - mean(diff_norm);
+%         diff_ang = atan(diff_norm*100)*180/pi;
+%        
+%         %d3(2:end) = diff(P.FIT201));
+%         figure;
+%         plot(P.FIT201);
+%         title('FIT201')
+%         figure;
+%         plot(diff_norm*100)
+%         title('diff norm')
+%         figure;
+%         plot(diff_ang)
+%         title('diff ang')
+%         figure;
+%         histogram(P.FIT201,'Normalization','probability')
+%         title('histogram FIT201')
+%         figure;
+%         histogram(diff_ang,90,'Normalization','probability')
+%         title('diff ang')
+
 %        d4 = movstd(P.AIT201,[wstd,0]);
 %       d5 = movstd(P.AIT202,[wstd,0]);
 %        d6 = movstd(P.AIT203,[wstd,0]);
 
-         P = addvars(P,d1,'Before','Attack','NewVariableNames','ADIFF_AIT201');
+%         P = addvars(P,d1,'Before','Attack','NewVariableNames','ADIFF_AIT201');
 %         P = addvars(P,d4,'Before','Anomaly','NewVariableNames',[mstd_name '_AIT201']);
          P = addvars(P,d2,'Before','Attack','NewVariableNames','ADIFF_AIT202');
 %         P = addvars(P,d5,'Before','Anomaly','NewVariableNames',[mstd_name '_AIT202']);
-         P = addvars(P,d3,'Before','Attack','NewVariableNames','ADIFF_AIT203');
+%         P = addvars(P,d3,'Before','Attack','NewVariableNames','ADIFF_AIT203');
 %         P = addvars(P,d6,'Before','Anomaly','NewVariableNames',[mstd_name '_AIT203']);
     case 3
         d1(2:end) = abs(diff(P.DPIT301));

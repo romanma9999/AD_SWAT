@@ -1,1 +1,0 @@
-python calc_anomaly_stats.py -sn P6 -esn P6 -ft off -lt always -ofa _always -bcn FIT601,P602 

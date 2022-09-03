@@ -6,6 +6,7 @@ import xlsxwriter
 import xlrd
 from os.path import exists
 import copy
+import swat_htm
 
 parser = argparse.ArgumentParser(description='runtime configuration for HTM anomaly statistics on SWAT')
 parser.add_argument('--stage_name', '-sn', metavar='STAGE_NAME', default='P1', choices=['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], type=str.upper)
@@ -250,7 +251,7 @@ def get_channel_filenames(args,channels_list):
         if line_args[1] != 'swat_htm.py':
           continue
         line_args = line_args[2:]
-        args_tmp = parser.parse_args(line_args)
+        args_tmp = swat_htm.parser.parse_args(line_args)
         if args_tmp.channel_name != channel_name:
           continue
 

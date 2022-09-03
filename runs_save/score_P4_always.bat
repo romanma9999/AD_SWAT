@@ -1,1 +1,0 @@
-python calc_anomaly_stats.py -sn P4 -esn P4 -ft off -lt always -ofa _always -bcn AIT401,AIT402,FIT401,LIT401,P402,P403 

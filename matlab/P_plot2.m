@@ -21,11 +21,16 @@ figure;
 for i = 1:n_var_to_plot
     idx = var_to_plot(i);
     addon = (n_var_to_plot - i)*2;
+     v = Pvar(:,idx);
+     if isnan(v)
+         v = zeros(size(Pvar(:,idx)));
+     end
     if idx == AnomalyIdx 
-      plot(Ptime,addon + Pvar(:,idx),'r','LineWidth',1,'DisplayName','Attack');
+      plot(Ptime,addon + v,'r','LineWidth',1,'DisplayName','Attack');
       hold on;
     else
-      plot(Ptime,addon + Pvar(:,idx),'DisplayName',Pnames{idx});
+     
+      plot(Ptime,addon + v,'DisplayName',Pnames{idx});
       hold on;
     end
     xlabel('datetime');

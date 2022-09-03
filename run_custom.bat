@@ -1,0 +1,1 @@
+python swat_htm.py --verbose -sn P2 -cn FIT201 -ctype 0 -ft off -lt always --output_file_path ./HTM_results/custom/

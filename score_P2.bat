@@ -1,1 +1,0 @@
-python calc_anomaly_stats.py -sn P2 -esn P2 -ft off -lt always -ofa _learn_mixed2 -bcn AIT202,FIT201,MV201,P203,P204,P205

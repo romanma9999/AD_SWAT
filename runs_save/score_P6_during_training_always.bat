@@ -1,1 +1,0 @@
-python calc_anomaly_stats.py -sn P6 -esn P6 -ft during_training -lt always -ofa _during_training_always -bcn FIT601,P602 
