@@ -19,8 +19,8 @@ A(8).e = '12/28/2015 13:26:13';
     % P3 : DPIT301 trivial min/max, others freq change
 %9
 A(10).s = '12/28/2015 14:16:20';% [4,5] SS, trivial min / max
-A(10).e = '12/28/2015 14:19:00';
-A(11).s = '12/28/2015 14:19:00';% [4,5] SS, trivial min / max
+A(10).e = '12/28/2015 14:18:49'; % UPDATED TIME TO SEPARATE ANOMALY LABELS, ORIGINALLY 19:00
+A(11).s = '12/28/2015 14:19:11';% [4,5] SS, trivial min / max 
 A(11).e = '12/28/2015 14:28:20';
 %12
 %13 - no impact
@@ -59,7 +59,7 @@ A(26).e = '12/30/2015 17:29:00';
 A(27).s = '12/31/2015 01:17:08';% [3,4] MS
     % P4: Lit410 value suddenly below min. 
     % P3: values stay constant longer than usual 
-A(27).e =  '12/31/2015 01:45:18';
+A(27).e =  '12/31/2015 01:44:58';% UPDATED TIME TO SEPARATE ANOMALY LABELS, ORIGINALLY 45:18
 A(28).s = '12/31/2015 01:45:19';% [1,2,3,4,5,6] SS , P6 : P602/FIT601 freq change, P1-P5 : values stay constant for long period of time
 A(28).e =   '12/31/2015 11:15:27';
 % 29  - no impact
@@ -91,25 +91,26 @@ A(40).s = '01/2/2016 11:51:42';% [4,5] SS, trivial min/max
 A(40).e ='01/2/2016 11:56:38';
 A(41).s = '01/2/2016 13:13:02';% [3] SS, trivial min/max
 A(41).e = '01/2/2016 13:40:56';
-PA_idx = [];
+%PA_idx = [];
+PA_idx = [1 2 3 6 7 8 10 11 16 17 19:28 30:41];
 %removed 28 from all..
- switch PID
-         case 1
-             PA_idx = [1 2 3                                            21                      26      28 30           33 34 35 36]; % not min/max : 3?, 21, 26 (eventually),28(long constant value), 30(value freeze then minmax), 33(value freeze then minmax), 35
-         case 2
-             %  FIT201(2,26,28,30), AIT202(6,28),P203(24,28)
-            PA_idx = [   2     6                                                        24      26       28 30]; % not min/max :28(long constant value)
-         case 3
-             %LIT301(7,16,26,26,32,41),DPIT301(8,23,27,28),MV301(17,28)
-            PA_idx = [             7 8            16 17                       23           26  27 28          32                                              41];  % not min/max : 17, 26 (constant value), 27, 28(long constant value)
-         case 4
-             %LIT401(8,17,23,25,27,28, 31) ,AIT402(10,11,22,28,38,40),FIT401(10,11,22,37,39,40)
-            PA_idx = [                8 10 11       17                 22 23      25       27  28     31                             37 38 39 40];  % not min/max :  8(eventually) , 17(eventually), 23(eventually),25, 27?, 28(long constant value)
-         case 5
-            PA_idx = [                   10 11            19 20       22                              28                                     37 38 39 40]; % not min/max : 19 (value fixed), 28(long constant value), 39 (value fixed)
-         case 6
-            PA_idx = [                8                                             23                         28 ];  % not min/max : 8,23 , 28(long constant value)
- end
+%  switch PID
+%          case 1
+%              PA_idx = [1 2 3                                            21                      26  27    28 30           33 34 35 36]; % not min/max : 3?, 21, 26 (eventually),28(long constant value), 30(value freeze then minmax), 33(value freeze then minmax), 35
+%          case 2
+%              %  FIT201(2,26,28,30), AIT202(6,28),P203(24,28)
+%             PA_idx = [   2     6                                                        24      26  27     28 30]; % not min/max :28(long constant value)
+%          case 3
+%              %LIT301(7,16,26,26,32,41),DPIT301(8,23,27,28),MV301(17,28)
+%             PA_idx = [             7 8            16 17                       23           26  27 28          32                                              41];  % not min/max : 17, 26 (constant value), 27, 28(long constant value)
+%          case 4
+%              %LIT401(8,17,23,25,27,28, 31) ,AIT402(10,11,22,28,38,40),FIT401(10,11,22,37,39,40)
+%             PA_idx = [                8 10 11       17                 22 23      25       27  28     31                             37 38 39 40];  % not min/max :  8(eventually) , 17(eventually), 23(eventually),25, 27?, 28(long constant value)
+%          case 5
+%             PA_idx = [                   10 11            19 20       22                            27  28                                     37 38 39 40]; % not min/max : 19 (value fixed), 28(long constant value), 39 (value fixed)
+%          case 6
+%             PA_idx = [                8                                             23                        27 28 ];  % not min/max : 8,23 , 28(long constant value)
+%  end
 
 end
 

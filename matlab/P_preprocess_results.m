@@ -22,9 +22,10 @@ end
 tmp = log_likelihood_anomaly>anomalylikelihoodThreshold;
 anomaly_log = log_likelihood_anomaly;
 anomaly_log(~tmp) = 0;
+anomaly_log = data.anomalylikelihood;
 
-
-anomaly_sum = movsum(anomaly_without_peaks,[119,0]);
+%anomaly_sum = movsum(anomaly_log,[119,0]);
+anomaly_sum = movsum(anomaly_without_peaks,[59,0]);
 tmp = anomaly_sum>1;
 anomaly_sum(tmp) = 1;
 tmp = anomaly_sum>anomalylikelihoodThreshold;

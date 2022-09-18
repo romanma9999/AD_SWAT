@@ -1,6 +1,6 @@
 import sys
 import argparse
-
+import json
 import csv
 import os
 import numpy as np
@@ -33,9 +33,13 @@ parser.add_argument('--diff_enabled', '-diff', default=False, action='store_true
 parser.add_argument('--search_best_parameters', '-sbp', default=True, action='store_false')
 parser.add_argument('--custom_min', '-cmin', metavar='MIN_VAL', default=2, type=int)
 parser.add_argument('--custom_max', '-cmax', metavar='MAX_VAL', default=3, type=int)
+# parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
 parser.add_argument('--limits_enabled', '-le', default=False, action='store_true')
+parser.add_argument('--encoding_duration_enabled', '-ede', default=True, action='store_true')
+parser.add_argument('--encoding_duration_value', '-ed_val', default=0, type=int)
+parser.add_argument('--encoding_duration_bins', '-ed_bins', default=10, type=int)
 parser.add_argument('--verbose', default=False, action='store_true')
 parser.add_argument('--prefix', default="", type=str.lower)
 parser.add_argument('--input_file_path', default="./HTM_input/", type=str)
@@ -44,6 +48,7 @@ parser.add_argument('--override_parameters', '-op', default="", type=str,
                     help="override parameter values, group_name,var_name,val,res/../.. ,param value = val/res")
 parser.add_argument('--replay_buffer', '-rpb', default=0, type=int)
 parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
+parser.add_argument('--sampling', '-sg', default=20, type=int, help="sampling interval")
 
 default_parameters = {
     'enc': {
@@ -60,11 +65,11 @@ default_parameters = {
     'tm': {'activationThreshold': 8,
            'cellsPerColumn': 5,
            'initialPerm': 0.21,
-           'maxSegmentsPerCell': 128,
-           'maxSynapsesPerSegment': 96,
+           'maxSegmentsPerCell': 32,
+           'maxSynapsesPerSegment': 256,
            'minThreshold': 3,
            'synPermConnected': 0.13999999999999999,
-           'permanenceDec': 0.001,
+            'permanenceDec': 0.001,
             'cellNewConnectionMaxSegmentsGap': 0,
            'permanenceInc': 0.1},
     'anomaly': {'period': 1000},
@@ -95,7 +100,10 @@ def main(args):
                       'replay_buffer' :args.replay_buffer,
                       'encoding_type': args.encoding_type,
                       'sum_window': args.sum_window,
-                      'sum_threshold': args.sum_threshold
+                      'sum_threshold': args.sum_threshold,
+                      'encoding_duration_value': args.encoding_duration_value,
+                      'encoding_duration_enabled': args.encoding_duration_enabled,
+                      'sampling_interval': args.sampling
                       }
 
     parameters = default_parameters
@@ -124,7 +132,7 @@ def main(args):
 
     config = parameters['runtime_config']
     stage = config['stage']
-    input_data = swat_utils.read_input(config['input_path'], config['meta_path'])
+    input_data = swat_utils.read_input(config['input_path'], config['meta_path'], args.sampling)
     assert stage.casefold() == input_data['stage'].casefold(), 'illegal input stage'
     features_info = input_data['features']
     V1PrmName = config['var_name']
@@ -133,6 +141,7 @@ def main(args):
     print('\nrun Stage1: min/max/mean/var of training data')
     print('==============================================')
     stage1_data = profiler_stage1(input_data, v1_idx)
+    parameters['runtime_config']['stage1_data'] = stage1_data
     n_records = len(input_data['records'])
     verbose = parameters['runtime_config']['verbose']
 
@@ -158,7 +167,7 @@ def main(args):
                 print(f'\n-----[ sdr = {sdr}, window = {window} ]-----')
                 parameters['enc']['size'] = sdr
                 parameters['runtime_config']['window'] = window
-                res = runner(input_data, stage1_data, parameters)
+                res = runner(input_data, parameters)
                 dtest = res["data"]["Anomaly Score"][0:training_count]
                 df = pandas.DataFrame(data = dtest)
                 scores = df.iloc[0:training_count, 0].rolling(sum_window, min_periods=1, center=False).sum()
@@ -176,20 +185,37 @@ def main(args):
         parameters['runtime_config']['window'] = best_window
         parameters['enc']['size'] = best_sdr
 
+    if parameters['runtime_config']['encoding_duration_enabled'] and parameters['runtime_config']['encoding_duration_value'] == 0:
+        print('Stage 3 - Find encodings max duration')
+        print('===================================')
+        training_count = input_data['training_count']
+        parameters['runtime_config']['max_records_to_run'] = training_count
+        parameters['runtime_config']['verbose'] = False
+        res = profiler_stage3(input_data, parameters)
+        print(f'\nmax_encoding_duration = {res["max_encoding_duration"]}')
+        delay_hist = res["delay_hist"]
+        print(f'\ndelay_hist = {delay_hist}')
+        parameters['runtime_config']["encoding_duration_value"] = res["max_encoding_duration"]
+        if delay_hist[-1] == 0.0 and delay_hist[-2] == 0.0 and delay_hist[-3] == 0.0:
+            parameters['runtime_config']['delay_hist'] = delay_hist
+        else:
+            print(f'\n delay encoding disabled due to statistics')
+
     print('Final Stage')
     print('===========')
     parameters['runtime_config']['max_records_to_run'] = n_records
     parameters['runtime_config']['verbose'] = verbose
-    res = runner(input_data,stage1_data,parameters)
+
+    res = runner(input_data,parameters)
     save_results(res)
 
     return
 
 
-def runner(input_data,stage1_data,parameters):
+def runner(input_data,parameters):
     config = parameters['runtime_config']
     verbose = config['verbose']
-
+    stage1_data = config['stage1_data']
     learn_during_training_only = config['learn_during_training_only']
     freeze_trained_network = config['freeze_configuration'] == "end_training"
     freeze_during_training = config['freeze_configuration'] == "during_training"
@@ -198,18 +224,6 @@ def runner(input_data,stage1_data,parameters):
     training_count = input_data['training_count']
     features_info = input_data['features']
     records = input_data['records']
-
-    if verbose:
-        import pprint
-        pprint.pprint(parameters, indent=4)
-        prm_output_filepath = ''.join([output_filepath, '_param.txt'])
-        with open(prm_output_filepath, 'w') as f:
-            pprint.pprint(parameters, indent=4,stream=f)
-            pprint.pprint(f"training points count: {training_count}", indent=4, stream=f)
-            pprint.pprint(f"total points count: {len(records)}", indent=4, stream=f)
-            pprint.pprint(features_info, indent=4, stream=f)
-
-
 
     sdr_size = parameters["enc"]["size"]
     sdr_sparsity = parameters["enc"]["sparsity"]
@@ -233,25 +247,75 @@ def runner(input_data,stage1_data,parameters):
 
     V1EncoderParams.minimum, V1EncoderParams.maximum = max_min_values(config,features_info[V1PrmName],stage1_data)
 
+    active_bits = 0
+
     if config['channel_type'] == 0:
         V1EncoderParams.size = sdr_size
         V1EncoderParams.sparsity = sdr_sparsity
+        active_bits = int(sdr_size * sdr_sparsity)
     else:
         V1EncoderParams.category = 1
 
-        V1EncoderParams.activeBits = int(sdr_size/(V1EncoderParams.maximum-V1EncoderParams.minimum+1))
+        active_bits = int(sdr_size/(V1EncoderParams.maximum-V1EncoderParams.minimum+1))
+        V1EncoderParams.activeBits = active_bits
         sdr_sparsity = float(V1EncoderParams.activeBits/sdr_size)
-        print(f'active bits: {V1EncoderParams.activeBits}')
 
-    print(f'encoder min: {V1EncoderParams.minimum:.4}, max: {V1EncoderParams.maximum:.4}')
     V1Encoder = ScalarEncoder(V1EncoderParams)
 
+    print(f'active bits: {active_bits}')
+    print(f'encoder min: {V1EncoderParams.minimum:.4}, max: {V1EncoderParams.maximum:.4}')
+
+
     V1EncodingSize = V1Encoder.size
-    encodingWidth = V1EncodingSize
-    enc_info = Metrics( [encodingWidth], 999999999 )
+    total_encoding_width = V1EncodingSize
+    encoding_map = []
+    encoding_map_idx = 0
+    default_encoding = list(range(total_encoding_width))
+    encoding_map.append(default_encoding)
+
+    delay_encoding_enabled = False
+    if 'delay_hist' in config.keys():
+        delay_encoding_enabled = True
+        delay_bins_list = [5,8,13,21,34,55,89,144,233, 377, 610, 987, 1597, 2584, 4181, 6765, 17711, 28657]
+        n_delay_bins_list = len(delay_bins_list)
+        delay_hist = config['delay_hist']
+
+        for idx, bin in enumerate(reversed(delay_hist)):
+            if bin:
+                delay_bins = [delay_bins_list[n_delay_bins_list - idx + 1],delay_bins_list[n_delay_bins_list - idx + 2]]
+                #delay_bins = [delay_bins_list[n_delay_bins_list - idx],delay_bins_list[n_delay_bins_list - idx + 1],delay_bins_list[n_delay_bins_list - idx + 2]]
+                # delay_bins = [delay_bins_list[n_delay_bins_list - idx + 2]]
+                break
+
+        print(f'delay bins {delay_bins}')
+        # delay_bins = [987]
+        #delay_bins = [5,8,13,21,34,55,89,144,233]
+        encoding_rng = random.Random()
+        for idx, val in enumerate(delay_bins):
+            random_encoding = default_encoding.copy()
+            encoding_rng.seed(val)
+            encoding_rng.shuffle(random_encoding)
+            encoding_map.append(random_encoding)
+
+        prev_delay_bin_idx = 0;
+        delay_bin_idx = 0
+        delay_value = config["encoding_duration_value"]
+        delay_encoding_width = swat_utils.get_delay_sdr_width(len(delay_bins) + 1)
+
+        parameters['runtime_config']['delay_bins'] = delay_bins
+
+
+    required_columns_for_prediction = [0, 1]
+    # required_columns_for_prediction = [0] * (delay_encoding_width+2)
+    # required_columns_for_prediction[0] = swat_utils.get_delay_active_columns_num(delay_encoding_width)
+    # required_columns_for_prediction[1] = active_bits+1
+    # for i in range(delay_encoding_width):
+    #     required_columns_for_prediction[2+i] = V1EncodingSize+i
+
+    enc_info = Metrics( [total_encoding_width], 999999999 )
 
     # Make the HTM.  SpatialPooler & TemporalMemory & associated tools.
-
+    activation_threshold = parameters["tm"]["activationThreshold"]
 
     # spParams = parameters["sp"]
     # sp = SpatialPooler(
@@ -271,9 +335,9 @@ def runner(input_data,stage1_data,parameters):
 
     tmParams = parameters["tm"]
     tm = TemporalMemory(
-        columnDimensions          = (sdr_size,),
+        columnDimensions          = (total_encoding_width,),
         cellsPerColumn            = tmParams["cellsPerColumn"],
-        activationThreshold       = tmParams["activationThreshold"],
+        activationThreshold       = activation_threshold,
         initialPermanence         = tmParams["initialPerm"],
         connectedPermanence       = tmParams["synPermConnected"],
         minThreshold              = tmParams["minThreshold"],
@@ -301,9 +365,7 @@ def runner(input_data,stage1_data,parameters):
     v1_prev_init = True
     v1_prev = 0
     window_prev = 0
-    max_const_duration = 0
-    current_const_duration = 0
-    prev_encoding = 0
+    prev_val1_encoding = 0
     test_count = 0
     window = config["window"]
     diff_enabled = config['diff_enabled']
@@ -311,18 +373,48 @@ def runner(input_data,stage1_data,parameters):
     encoding_type = config['encoding_type']
     max_records_to_run = config['max_records_to_run']
 
+    current_encoding_duration = 0
+
     if replay_buffer:
         sdr_rbuffer = collections.deque(maxlen=replay_buffer)
 
     if window > 1:
         val_buffer = collections.deque(maxlen=window)
-    # main loop
+
+
+    tm.set_required_columns_for_prediction(required_columns_for_prediction)
+
+    # ======================================================
+    # ==================== main loop =======================
+    # ======================================================
+    test_input = [500, 510, 520, 510, 520, 510, 520, 510, 520, 520, 520, 520, 520, 520, 520, 520, 520,520,520,520 ]
+    test_enabled = False
+    # test_enabled = True
+
+
+    if verbose:
+        import pprint
+        pprint.pprint(parameters, indent=4)
+        prm_output_filepath = ''.join([output_filepath, '_param.txt'])
+        with open(prm_output_filepath, 'w') as f:
+            pprint.pprint(parameters, indent=4,stream=f)
+            pprint.pprint(f"training points count: {training_count}", indent=4, stream=f)
+            pprint.pprint(f"total points count: {len(records)}", indent=4, stream=f)
+            pprint.pprint(features_info, indent=4, stream=f)
+        prm_output_filepath_json = ''.join([output_filepath, '_param.json'])
+        with open(prm_output_filepath_json, 'w') as fj:
+            fj.write(json.dumps(parameters))
+
+
     for count, record in enumerate(records):
         if count == max_records_to_run:
             break
 
         # get value and truncate to min/max
-        record_val = float(record[v1_idx])
+        if test_enabled and count < len(test_input):
+            record_val = float(test_input[count])
+        else:
+            record_val = float(record[v1_idx])
 
         if not diff_enabled:
             record_val = keep_limits(record_val,V1EncoderParams.minimum,V1EncoderParams.maximum)
@@ -330,8 +422,8 @@ def runner(input_data,stage1_data,parameters):
         # sliding window
         if window > 1:
             val_buffer.append(record_val)
-            n = 0
-            s = 0
+            n = 0.0
+            s = 0.0
             for v in val_buffer:
                 s += v
                 n += 1
@@ -340,17 +432,17 @@ def runner(input_data,stage1_data,parameters):
         else:
             window_val = record_val
 
-        if count == 0:
-            window_prev = window_val
-
        # diff values
         if diff_enabled:
             if count == 0:
+                window_prev = window_val
                 continue
             v1_val = window_val - window_prev
             v1_val = keep_limits(v1_val, V1EncoderParams.minimum, V1EncoderParams.maximum)
         else:
             v1_val = window_val
+
+        window_prev = window_val
 
         if v1_prev_init:
             v1_prev_init = False
@@ -364,12 +456,17 @@ def runner(input_data,stage1_data,parameters):
             test_count += 1
 
         # Call the encoders to create bit representations for each value.  These are SDR objects.
-        encoding = V1Encoder.encode(v1_val)
-        enc_info.addData(encoding)
+        default_encoding = V1Encoder.encode(v1_val)
+        # encoding_map_idx 0 is the default 1:1 encoding
+        if encoding_map_idx:
+            val1_encoding = SDR(total_encoding_width)
+            val1_encoding.sparse = [encoding_map[encoding_map_idx][i] for i in default_encoding.sparse]
+        else:
+            val1_encoding = default_encoding
 
         # add SDR to replay buffer
         if replay_buffer:
-            sdr_rbuffer.append(encoding)
+            sdr_rbuffer.append(val1_encoding)
 
         training_period = count < training_count
         learn = True
@@ -402,10 +499,30 @@ def runner(input_data,stage1_data,parameters):
         if encoding_type == 'raw':
             run_tm = True
         if encoding_type == 'diff':
-            if count < 2 or (prev_encoding != encoding):
+            if count < 2:
+                run_tm = True
+                prev_default_encoding_delay = default_encoding
+                prev_val1_encoding = val1_encoding
+
+            if prev_val1_encoding != val1_encoding:
                 run_tm = True
 
+            if delay_encoding_enabled:
+                delay_bin_idx = swat_utils.get_delay_bin_idx(delay_bins, current_encoding_duration)
+                if delay_bin_idx != prev_delay_bin_idx:
+                    encoding_map_idx = delay_bin_idx
+                    prev_delay_bin_idx = delay_bin_idx
+
+                if count < 2 or (default_encoding.getOverlap(prev_default_encoding_delay) < active_bits * 0.7):
+                    prev_default_encoding_delay = default_encoding
+                    current_encoding_duration = 0
+                else:
+                    current_encoding_duration += 1
+
         if run_tm:
+            encoding = val1_encoding
+
+            enc_info.addData(encoding)
             if val_is_black:
                 tm.compute(encoding, learn=False, permanent=False)
             else:
@@ -422,8 +539,11 @@ def runner(input_data,stage1_data,parameters):
                 anomaly[count] = 0.0
                 anomalyProb[count] = 0.0
             else:
-                anomaly[count] = tm.anomaly
-                anomalyProb[count] = anomaly_history.compute(tm.anomaly)
+                # anomaly[count] = tm.anomaly
+                predicted = tm.getPredictedColumns()
+                anomaly[count] = swat_utils.computeAnomalyScore(encoding, predicted)
+                # assert math.fabs(score - tm.anomaly) < 0.0000001, "anomaly calculation wrong"
+                anomalyProb[count] = anomaly_history.compute(anomaly[count])
 
             if replay_buffer and tm.anomaly:
                 for replay_enc in sdr_rbuffer:
@@ -432,23 +552,8 @@ def runner(input_data,stage1_data,parameters):
             anomaly[count] = 0.0
             anomalyProb[count] = 0.0
 
-        prev_encoding = encoding
+        prev_val1_encoding = val1_encoding
         v1_prev = v1_val
-        record_prev = record_val
-
-        # if count == 1:
-        #     prev_value = v1_val;
-        # else:
-        #     if v1_val == prev_value:
-        #         current_const_duration += 1
-        #         if count > training_count:
-        #             if current_const_duration > max_const_duration:
-        #                 anomaly[count] = 1
-        #     else:
-        #         if count < training_count:
-        #             max_const_duration = max(max_const_duration,current_const_duration)
-        #
-        #         current_const_duration = 0
 
         print_progress(count)
 
@@ -480,6 +585,8 @@ def runner(input_data,stage1_data,parameters):
     pred1 = anomaly
     pred5 = anomaly
     # end placeholder
+
+
     data = {"Input": inputs, "1 Step Prediction": pred1, "5 Step Prediction": pred5,
             "Anomaly Score": anomaly, "Anomaly Likelihood": anomalyProb}
     result ={"data": data, "output_filepath": output_filepath,"attack_label": attack_label,"test_count":test_count}
@@ -574,6 +681,126 @@ def profiler_stage1(input_data,var_idx):
 
     return stage1_data
 
+
+
+def profiler_stage3(input_data,parameters):
+    config = parameters['runtime_config']
+    features_info = input_data['features']
+    records = input_data['records']
+    stage1_data = config['stage1_data']
+    sdr_size = parameters["enc"]["size"]
+    sdr_sparsity = parameters["enc"]["sparsity"]
+
+    V1PrmName = config['var_name']
+    v1_idx = features_info[V1PrmName]['idx']
+
+    V1EncoderParams = ScalarEncoderParameters()
+    V1EncoderParams.minimum, V1EncoderParams.maximum = max_min_values(config,features_info[V1PrmName],stage1_data)
+
+    if config['channel_type'] == 0:
+        V1EncoderParams.size = sdr_size
+        V1EncoderParams.sparsity = sdr_sparsity
+        active_bits = int(sdr_size * sdr_sparsity)
+    else:
+        V1EncoderParams.category = 1
+
+        active_bits = int(sdr_size/(V1EncoderParams.maximum-V1EncoderParams.minimum+1))
+        V1EncoderParams.activeBits = active_bits
+
+    V1Encoder = ScalarEncoder(V1EncoderParams)
+
+    print(f'active bits: {active_bits}')
+    print(f'encoder min: {V1EncoderParams.minimum:.4}, max: {V1EncoderParams.maximum:.4}')
+
+
+
+    delay_bins = [5,8,13,21,34,55,89,144,233, 377, 610, 987, 1597, 2584, 4181, 6765, 17711, 28657]
+    delay_hist_count = 0
+    prev_delay_bin_idx = 0;
+    delay_hist = [0] * (len(delay_bins) + 1)
+    delay_hist_percent = [0] * (len(delay_bins) + 1)
+
+    v1_prev_init = True
+    window_prev = 0
+    window = config["window"]
+    diff_enabled = config['diff_enabled']
+    max_records_to_run = config['max_records_to_run']
+
+    max_encoding_duration = 0
+    current_encoding_duration = 0
+
+    if window > 1:
+        val_buffer = collections.deque(maxlen=window)
+
+    # ======================================================
+    # ==================== main loop =======================
+    # ======================================================
+
+    for count, record in enumerate(records):
+        if count == max_records_to_run:
+            break
+
+        record_val = float(record[v1_idx])
+
+        if not diff_enabled:
+            record_val = keep_limits(record_val,V1EncoderParams.minimum,V1EncoderParams.maximum)
+
+        # sliding window
+        if window > 1:
+            val_buffer.append(record_val)
+            n = 0.0
+            s = 0.0
+            for v in val_buffer:
+                s += v
+                n += 1
+
+            window_val = s/n
+        else:
+            window_val = record_val
+
+       # diff values
+        if diff_enabled:
+            if count == 0:
+                window_prev = window_val
+                continue
+            v1_val = window_val - window_prev
+            v1_val = keep_limits(v1_val, V1EncoderParams.minimum, V1EncoderParams.maximum)
+        else:
+            v1_val = window_val
+
+        window_prev = window_val
+
+        if v1_prev_init:
+            v1_prev_init = False
+
+        default_encoding = V1Encoder.encode(v1_val)
+
+        if count < 2:
+            prev_default_encoding_delay = default_encoding
+
+        delay_bin_idx = swat_utils.get_delay_bin_idx(delay_bins, current_encoding_duration)
+        if delay_bin_idx != prev_delay_bin_idx:
+            prev_delay_bin_idx = delay_bin_idx
+
+        if count < 2 or (default_encoding.getOverlap(prev_default_encoding_delay) < active_bits * 0.7):
+            max_encoding_duration = max(current_encoding_duration,max_encoding_duration)
+            delay_hist[delay_bin_idx] +=1
+            delay_hist_count +=1
+
+            prev_default_encoding_delay = default_encoding
+            current_encoding_duration = 0
+        else:
+            current_encoding_duration += 1
+
+    if delay_hist_count:
+        for i,v in enumerate(delay_hist):
+            delay_hist_percent[i] = delay_hist[i]*100.0/delay_hist_count
+
+    result ={'max_encoding_duration':max_encoding_duration,'delay_hist': delay_hist_percent}
+    return result
+
+
+
 def print_progress(count):
     if count > 1 and count % 100000 == 0:
         print(f"{count}")
@@ -607,21 +834,23 @@ def max_min_values(config, var_info,stage1_data):
 
 def keep_limits(val,min_val,max_val):
     if val < min_val:
-        val = min_val
+        val = min_val + 0.000001
 
     if val > max_val:
-        val = max_val
+        val = max_val - 0.000001
 
     return val
 
 if __name__ == "__main__":
     # sys.argv = ['swat_htm.py',
-    #             '--stage_name', 'P2',
-    #             '--channel_name', 'FIT201',
+    #             '--stage_name', 'P1',
+    #             '--channel_name', 'LIT101',
     #             '--freeze_type', 'off',
     #             '--learn_type', 'always',
     #             '--verbose',
-    #             '-ctype','0']
+    #             '-ctype','0',
+    #             '-sbp','-w','5','-size','1024','-ed_val','1']
+
 
     args = parser.parse_args()
     print(args)

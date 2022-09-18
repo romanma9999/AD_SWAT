@@ -1,5 +1,2 @@
-call run_learn_always.bat
-call run_learn_train_only.bat
-call run_learn_always_freeze_end_training.bat
-call run_learn_mixed.bat
-call run_learn_mixed_freeze_during_training.bat
+call run_learn_mixed.bat > run_learn_mixed.txt
+call run_learn_mixed_diff.bat > run_learn_mixed_diff.txt

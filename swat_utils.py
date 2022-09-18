@@ -1,15 +1,22 @@
 import csv
 import pandas
+from htm.bindings.sdr import SDR
 
-def read_input(input_path, meta_path):
+def read_input(input_path, meta_path, sampling_interval):
 # read input for running HTM on SWAT
 
     meta = []
     records = []
+    sampling_count = 0
     with open(input_path, "r") as fin:
         reader = csv.reader(fin)
         for record in reader:
-            records.append(record)
+            if sampling_count == 0:
+              records.append(record)
+            sampling_count +=1
+            if sampling_count == sampling_interval:
+              sampling_count = 0
+
 
     with open(meta_path, "r") as fin:
         reader = csv.reader(fin)
@@ -24,7 +31,7 @@ def read_input(input_path, meta_path):
     input_data = {'meta': meta,
              'records': records,
              'stage': meta[0],
-             'training_count': int(meta[1]),
+             'training_count': int(meta[1])//sampling_interval,
              'features': features_info}
 
     return input_data
@@ -73,7 +80,7 @@ def count_continuous_ones(data):
   return found
 
 
-def calc_anomaly_stats(scores, labels, grace_time = 60):
+def calc_anomaly_stats(scores, labels, grace_time):
   l_count = 0
   s_false_count = 0
   TP_detected_labels = []
@@ -170,8 +177,9 @@ def calc_anomaly_stats(scores, labels, grace_time = 60):
   stats['PR'] = PR
   stats['RE'] = RE
   stats['F1'] = F1(PR, RE)
-  stats['detected_labels'] = TP_detected_labels
+  stats['detected_labels'] = stage_id_to_global_id(0,TP_detected_labels)
   stats['detection_delay'] = TP_detection_delay
+  assert len(TP_detection_delay) == len(stats['detected_labels']), 'TP_detection_delay len error'
   stats['fp_array'] = FP_arr
   stats['LabelsCount'] = l_count
 
@@ -279,10 +287,135 @@ def test_count_continuous_ones():
   val = count_continuous_ones(a)
   print(f'found {val} continuous ones')
 
+def computeAnomalyScore(active, predicted):
+  if active.getSum() == 0:
+    return 0.0
 
+  both = SDR(active.dimensions)
+  both.intersection(active, predicted)
+
+  score = (active.getSum() - both.getSum()) / active.getSum()
+
+  return score
+
+
+def stage_id_to_global_id(stage_id, stage_id_list):
+  # id:0 is all labels, id:1..6 is P1..P6
+  stage_ids_map = [ [1, 2, 3, 6, 7, 8, 10, 11, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41],
+                    [1, 2, 3, 21, 26,27, 28, 30, 33, 34, 35, 36],
+                    [2, 6, 24, 26, 27, 28, 30],
+                    [7, 8, 16, 17, 23, 26, 27, 28, 32, 41],
+                    [8, 10, 11, 17, 22, 23, 25, 27, 28, 31, 37, 38, 39, 40],
+                    [10, 11, 19, 20, 22,27, 28, 37, 38, 39, 40],
+                    [8, 23, 28]
+                    ]
+
+  assert stage_id >= 0 and  stage_id <=6, 'illegal stage id'
+
+  res = [stage_ids_map[stage_id][idx-1] for idx in stage_id_list]
+  return res
+
+def get_delay_sdr_width(bin_size : int):
+  assert bin_size >= 1 and bin_size <= 20, 'bin size > 20'
+  if bin_size == 1:
+    return 1
+  if bin_size == 2:
+    return 2
+  if bin_size == 3:
+    return 3
+  if bin_size >= 4 and bin_size <=6:
+    return 4
+  if bin_size >= 7 and bin_size <=10:
+    return 5
+  if bin_size >= 11 and bin_size <=20:
+    return 6
+
+
+def get_delay_bin_idx(bins, value):
+  for idx ,bin_val in enumerate(bins):
+    if value < bin_val:
+      return idx
+
+  return len(bins)
+
+
+def get_delay_active_columns_num(sdr_len):
+  assert sdr_len >=0 and sdr_len <= 6, 'illegal sdr_len'
+  val = [0, 1, 1, 2, 2, 2, 3]
+  return val[sdr_len]
+
+
+def get_delay_sdr(state_idx, sdr_len):
+
+  s = [[[1]], #1
+       [[1, 0], #2
+        [0, 1]],
+       [[1, 1, 0], #3
+        [1, 0, 1],
+        [0, 1, 1]],
+       [[1, 1, 0, 0], #4
+        [1, 0, 1, 0],
+        [1, 0, 0, 1],
+        [0, 1, 1, 0],
+        [0, 1, 0, 1],
+        [0, 0, 1, 1]],
+       [[1, 1, 0, 0, 0], #5
+        [1, 0, 1, 0, 0],
+        [1, 0, 0, 1, 0],
+        [1, 0, 0, 0, 1],
+        [0, 1, 1, 0, 0],
+        [0, 1, 0, 1, 0],
+        [0, 1, 0, 0, 1],
+        [0, 0, 1, 1, 0],
+        [0, 0, 1, 0, 1],
+        [0, 0, 0, 1, 1]],
+     [[1, 1, 1, 0, 0, 0], #6
+      [1, 1, 0, 1, 0, 0],
+      [1, 1, 0, 0, 1, 0],
+      [1, 1, 0, 0, 0, 1],
+      [1, 0, 1, 1, 0, 0],
+      [1, 0, 1, 0, 1, 0],
+      [1, 0, 1, 0, 0, 1],
+      [1, 0, 0, 1, 1, 0],
+      [1, 0, 0, 1, 0, 1],
+      [1, 0, 0, 0, 1, 1],
+      [0, 1, 1, 1, 0, 0],
+      [0, 1, 1, 0, 1, 0],
+      [0, 1, 1, 0, 0, 1],
+      [0, 1, 0, 1, 1, 0],
+      [0, 1, 0, 1, 0, 1],
+      [0, 1, 0, 0, 1, 1],
+      [0, 0, 1, 1, 1, 0],
+      [0, 0, 1, 1, 0, 1],
+      [0, 0, 1, 0, 1, 1],
+      [0, 0, 0, 1, 1, 1]]]
+
+  assert sdr_len <= 6 , 'get_state_sdr: sdr_len >  6'
+  assert state_idx < len(s[sdr_len-1]), 'get_state_sdr: idx > max len'
+
+  return s[sdr_len-1][state_idx]
+
+
+def test_get_state_sdr():
+  s = get_delay_sdr(0,2)
+  assert s == [1,0], 'get_state_sdr(0,2)'
+
+  s = get_delay_sdr(1,3)
+  assert s == [1, 0, 1], ' get_state_sdr(1,3)'
+
+  s = get_delay_sdr(19,6)
+  assert s == [0, 0, 0, 1, 1, 1], ' get_state_sdr(19,6)'
+
+  print('test_get_state_sdr test done')
+
+def test_stage_id_to_global_id():
+  ids = stage_id_to_global_id(1,[1,4,11])
+  assert ids == [1,21,36], 'mapping error'
 
 if __name__ == "__main__":
+  test_stage_id_to_global_id()
+  # test_get_state_sdr()
   # test_calc_anomaly_stats()
-  test_count_continuous_ones()
+  #test_count_continuous_ones()
 
 

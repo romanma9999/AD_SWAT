@@ -9,4 +9,7 @@ TSAD/
 HTM_results/
 excel_Results/
 HTM_input/
+paper/
+runs_save/
 *.xlsx
+*.txt
