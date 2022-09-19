@@ -13,3 +13,4 @@ paper/
 runs_save/
 *.xlsx
 *.txt
+*.json

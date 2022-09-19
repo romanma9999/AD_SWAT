@@ -229,6 +229,33 @@ def write_stats_to_excel(worksheet, raw, stats,format):
 
   return
 
+
+
+
+
+def save_to_csv(filename, stats):
+
+  tp_data = {}
+  fp_data = {}
+  LABELS_NUM = 41
+  for key, s in stats.items():
+    fp_data[key] = [s[key]['TP'], s[key]['FP']]
+    tmp = [0]*LABELS_NUM
+    labels = s[key]['detected_labels']
+    for idx in labels:
+      tmp[idx-1] = 1
+
+    tp_data[key] = tmp
+
+  tp_filename = f'{filename}{args.output_filename_addon}_dl_{args.stage_name}.csv'
+  tp = pd.DataFrame(tp_data)
+  tp.to_csv(tp_filename, sep=',', index=False)
+  fp_filename = f'{filename}{args.output_filename_addon}_TFP_{args.stage_name}.csv'
+  fp = pd.DataFrame(fp_data)
+  fp.to_csv(fp_filename, sep=',', index=False)
+
+  return
+
 def save_to_excel(filename, stats):
   filename = f'{filename}{args.output_filename_addon}.xlsx'
   workbook = xlsxwriter.Workbook(filename)
@@ -263,11 +290,10 @@ def save_final_to_excel(filename, stats):
   filename = f'{filename}{args.output_filename_addon}.xlsx'
   workbook = xlsxwriter.Workbook(filename)
   if exists(filename):
-    open_file_for_update(filename,workbook,args.excel_sheet_name)
-  worksheet = workbook.add_worksheet('Final')
+    open_file_for_update(filename,workbook,'Total')
+  worksheet = workbook.add_worksheet('Total')
   format_head = workbook.add_format({'align': 'center'})
   format_cells = workbook.add_format({'align': 'center'})
-
   first = True
   idx_channel = 1
   for (channel_name, channel) in stats.items():
@@ -283,6 +309,17 @@ def save_final_to_excel(filename, stats):
           worksheet.set_column(idx+1, idx+1, max(8, len(key)+1))
 
   workbook.close()
+
+  return
+
+def save_final_to_csv(filename, stats):
+  data = {}
+  for key, s in stats.items():
+    data[key] = [s['TP'], s['FP'], s['FN'],s['PR'],s['RE'],s['F1']]
+
+  filename = f'{filename}{args.output_filename_addon}_final.csv'
+  tp = pd.DataFrame(data)
+  tp.to_csv(filename, sep=',', index=False)
 
   return
 
@@ -358,20 +395,21 @@ def main(args):
       stats[channel_name] = get_channel_stats(args,channel_name,file_prefix,label_prefix)
       channel_stats[channel_name] = stats[channel_name][channel_name]
 
+    save_to_csv(args.excel_filename,stats)
     stats[args.stage_name] = {args.stage_name: unify_stats(channel_stats,args.grace_time)}
 
     save_for_final_stage(json_filename,args.stage_name,stats)
 
-  del stats[args.stage_name][args.stage_name]['fp_array']
+    del stats[args.stage_name][args.stage_name]['fp_array']
 
-  for _, s in stats.items():
-    for key, value in s.items():
-      if 'fp_array' in value:
-        del value['fp_array']
-      print(f'{key:5}:{value}')
+    for _, s in stats.items():
+      for key, value in s.items():
+        if 'fp_array' in value:
+          del value['fp_array']
+        print(f'{key:5}:{value}')
 
 
-  save_to_excel(args.excel_filename, stats)
+    save_to_excel(args.excel_filename, stats)
 
   return
 
@@ -391,11 +429,12 @@ def save_for_final_stage(filename, stage_name, stats):
 def final_stage(filename):
     with open(filename) as f:
       final_stats = json.loads(f.read())
-    final_stats['Final'] = unify_stats(final_stats, args.grace_time)
+    final_stats['Total'] = unify_stats(final_stats, args.grace_time)
 
-    del final_stats['Final']['fp_array']
+    del final_stats['Total']['fp_array']
 
     save_final_to_excel(args.excel_filename, final_stats)
+    save_final_to_csv(args.excel_filename, final_stats)
     return
 
 def test_unify_detection_delay_list():
