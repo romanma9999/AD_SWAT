@@ -1,4 +1,4 @@
-function  P_plot(P,plot_cfg,AnomalyIdx,PID)
+function  P_plot2(P,plot_cfg,AnomalyIdx,threshold,PID)
 
 [PA,PA_idx] = get_anomaly_times(PID);
 nPA = length(PA_idx);
@@ -17,6 +17,8 @@ end
 Pvar = (Pvar - min(Pvar))./(max(Pvar) - min(Pvar));
 Ptime = P.Time;
 
+ScoreIdx = var_to_plot(n_var_to_plot);
+
 figure;
 for i = 1:n_var_to_plot
     idx = var_to_plot(i);
@@ -32,7 +34,10 @@ for i = 1:n_var_to_plot
      
       plot(Ptime,addon + v,'DisplayName',Pnames{idx});
       hold on;
-    end
+      if idx == ScoreIdx 
+         v = ones(size(Pvar(:,idx)))*threshold;
+        plot(Ptime,addon + v,':r','LineWidth',1);
+     end
     xlabel('datetime');
     grid on;
 end

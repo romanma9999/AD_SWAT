@@ -25,11 +25,11 @@ anomaly_log(~tmp) = 0;
 anomaly_log = data.anomalylikelihood;
 
 %anomaly_sum = movsum(anomaly_log,[119,0]);
-anomaly_sum = movsum(anomaly_without_peaks,[59,0]);
+anomaly_sum = movsum(anomaly_without_peaks,[119,0]);
 tmp = anomaly_sum>1;
 anomaly_sum(tmp) = 1;
 tmp = anomaly_sum>anomalylikelihoodThreshold;
-anomaly_sum(~tmp) = 0;
+%anomaly_sum(~tmp) = 0;
 
 
 P = addvars(P,anomaly_mean,anomaly_sum,anomaly_log,data.anomaly,data.inputs,'NewVariableNames',{'Temporal Mean Score (10 sec)','Temporal Sum Score (2 min)','Scaled Log Likelihood Score','Instant Score','Inputs'});

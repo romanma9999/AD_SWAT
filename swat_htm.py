@@ -29,6 +29,7 @@ parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=1024, typ
 parser.add_argument('--connection_segments_gap', '-csg', default=1, type=int)
 parser.add_argument('--sdr_sparsity', '-sparsity', metavar='SDR_SPARCITY', default=0.02, type=float)
 parser.add_argument('--window', '-w', metavar='MOVMEAN_WINDOW', default=1, type=int)
+parser.add_argument('--window_tight', '-wt', default=True, action='store_false')
 parser.add_argument('--diff_enabled', '-diff', default=False, action='store_true')
 parser.add_argument('--search_best_parameters', '-sbp', default=True, action='store_false')
 parser.add_argument('--custom_min', '-cmin', metavar='MIN_VAL', default=2, type=int)
@@ -48,7 +49,7 @@ parser.add_argument('--override_parameters', '-op', default="", type=str,
                     help="override parameter values, group_name,var_name,val,res/../.. ,param value = val/res")
 parser.add_argument('--replay_buffer', '-rpb', default=0, type=int)
 parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
-parser.add_argument('--sampling', '-sg', default=20, type=int, help="sampling interval")
+parser.add_argument('--sampling', '-sg', default=10, type=int, help="sampling interval")
 
 default_parameters = {
     'enc': {
@@ -182,6 +183,18 @@ def main(args):
                         break
 
         print(f'best window = {best_window}, sdr = {best_sdr} with {min_score} sum_scores > {sum_threshold} ')
+        if not args.window_tight:
+            if best_window == 1:
+                best_window = 3
+            elif best_window == 3:
+                best_window = 5
+            elif best_window == 5:
+                best_window = 8
+            elif best_window == 8:
+                best_window = 13
+            elif best_window == 13:
+                best_window = 21
+
         parameters['runtime_config']['window'] = best_window
         parameters['enc']['size'] = best_sdr
 
@@ -283,7 +296,7 @@ def runner(input_data,parameters):
         for idx, bin in enumerate(reversed(delay_hist)):
             if bin:
                 delay_bins = [delay_bins_list[n_delay_bins_list - idx + 1],delay_bins_list[n_delay_bins_list - idx + 2]]
-                #delay_bins = [delay_bins_list[n_delay_bins_list - idx],delay_bins_list[n_delay_bins_list - idx + 1],delay_bins_list[n_delay_bins_list - idx + 2]]
+                # delay_bins = [delay_bins_list[n_delay_bins_list - idx],delay_bins_list[n_delay_bins_list - idx + 1],delay_bins_list[n_delay_bins_list - idx + 2]]
                 # delay_bins = [delay_bins_list[n_delay_bins_list - idx + 2]]
                 break
 

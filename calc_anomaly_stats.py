@@ -22,8 +22,8 @@ parser.add_argument('--raw_threshold', '-rth', default=0.4, type=float, help="ra
 parser.add_argument('--logl_threshold', '-lglth', default=0.6, type=float, help="log likelihood anomaly score threshold")
 parser.add_argument('--mean_window', '-rw', default=9, type=int, help="moving mean anomaly score window")
 parser.add_argument('--mean_threshold', '-mth', default=0.6, type=float, help="moving mean anomaly score threshold")
-parser.add_argument('--sum_window', '-sw', default=59, type=int, help="moving sum anomaly score window")
-parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
+parser.add_argument('--sum_window', '-sw', default=12, type=int, help="moving sum anomaly score window")
+parser.add_argument('--sum_threshold', '-sth', default=0.7, type=float, help="moving sum anomaly score threshold")
 # parser.add_argument('--training_count', '-tc', default=414000, type=int, help="training points count")
 parser.add_argument('--excel_filename', '-efn', default="swat_htm_results", type=str)
 parser.add_argument('--excel_sheet_name', '-esn', default="P1", type=str)
@@ -32,7 +32,7 @@ parser.add_argument('--verbose', default=False, action='store_true')
 parser.add_argument('--training_score', default=False, action='store_true')
 parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
 parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
-parser.add_argument('--grace_time', '-gt', default=90, type=int, help="unify grace time")
+parser.add_argument('--grace_time', '-gt', default=120, type=int, help="unify grace time")
 parser.add_argument('--final_stage', default=False, action='store_true')
 
 
@@ -186,7 +186,7 @@ def get_channel_stats(args,channel_name,input_prefix,label_prefix):
   else:
     raw_scores = df.iloc[training_count:, 3]
     #df['raw_4sum'] = df.iloc[:, 3]
-    # df.loc[df['raw_4sum'] >= args.raw_threshold, 'raw_4sum'] = 1.0
+    #df.loc[df['raw_4sum'] >= args.raw_threshold, 'raw_4sum'] = 1.0
     #sum_scores = df.loc[training_count:, 'raw_4sum'].rolling(args.sum_window, min_periods=1, center=False).sum()
     sum_scores = df.iloc[training_count:, 3].rolling(args.sum_window, min_periods=1, center=False).sum()
     # logl_scores = df.iloc[training_count:, 4]
@@ -237,9 +237,11 @@ def save_to_csv(filename, stats):
 
   tp_data = {}
   fp_data = {}
+  params_data = {}
   LABELS_NUM = 41
   for key, s in stats.items():
     fp_data[key] = [s[key]['TP'], s[key]['FP']]
+    params_data[key] = [s[key]['window'], s[key]['sdr_size']]
     tmp = [0]*LABELS_NUM
     labels = s[key]['detected_labels']
     for idx in labels:
@@ -247,12 +249,15 @@ def save_to_csv(filename, stats):
 
     tp_data[key] = tmp
 
-  tp_filename = f'{filename}{args.output_filename_addon}_dl_{args.stage_name}.csv'
+  tp_filename = f'{args.output_file_path}{filename}{args.output_filename_addon}_dl_{args.stage_name}.csv'
   tp = pd.DataFrame(tp_data)
   tp.to_csv(tp_filename, sep=',', index=False)
-  fp_filename = f'{filename}{args.output_filename_addon}_TFP_{args.stage_name}.csv'
+  fp_filename = f'{args.output_file_path}{filename}{args.output_filename_addon}_TFP_{args.stage_name}.csv'
   fp = pd.DataFrame(fp_data)
   fp.to_csv(fp_filename, sep=',', index=False)
+  params_filename = f'{args.output_file_path}{filename}{args.output_filename_addon}_params_{args.stage_name}.csv'
+  pp = pd.DataFrame(params_data)
+  pp.to_csv(params_filename, sep=',', index=False)
 
   return
 
@@ -317,7 +322,7 @@ def save_final_to_csv(filename, stats):
   for key, s in stats.items():
     data[key] = [s['TP'], s['FP'], s['FN'],s['PR'],s['RE'],s['F1']]
 
-  filename = f'{filename}{args.output_filename_addon}_final.csv'
+  filename = f'{args.output_file_path}{filename}{args.output_filename_addon}_final.csv'
   tp = pd.DataFrame(data)
   tp.to_csv(filename, sep=',', index=False)
 
@@ -371,7 +376,7 @@ def get_channel_filenames(args,channels_list):
   return channel_filenames_list
 
 def main(args):
-  json_filename = f'{args.excel_filename}{args.output_filename_addon}.json'
+  json_filename = f'{args.output_file_path}{args.excel_filename}{args.output_filename_addon}.json'
   if args.final_stage:
     final_stage(json_filename)
     return
