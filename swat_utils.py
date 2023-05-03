@@ -100,7 +100,8 @@ def calc_anomaly_stats(scores, labels, grace_time):
   stats['detection_delay'] = []
   stats['fp_array'] = []
   stats['LabelsCount'] = 0
-
+  label_grace_time = grace_time//10
+  last_label_detected = False
 
   if len(scores) != N:
     print(f'Error, labels{N} and anomaly{len(scores)} vectors length is different')
@@ -132,6 +133,7 @@ def calc_anomaly_stats(scores, labels, grace_time):
     if l_now and l_prev == False:
       l_count = l_count+1
       in_label = True
+      last_label_detected = False
       l_start_time = idx
 
     if l_now == False:
@@ -141,6 +143,7 @@ def calc_anomaly_stats(scores, labels, grace_time):
     if in_label and l_marked == False and s_now:
       TP_detected_labels.append(l_count)
       TP_detection_delay.append(idx - l_start_time)
+      last_label_detected = True
       l_marked = True
 
 
@@ -148,6 +151,16 @@ def calc_anomaly_stats(scores, labels, grace_time):
       s_marked = True
 
     if (s_prev and s_now == False) or (s_now and idx == N-1):
+      if s_marked == False:
+        if not last_label_detected:
+          max_hist = min(FP_start_idx, label_grace_time)
+          for i in range(max_hist):
+            if labels[FP_start_idx - i] == 1:
+              TP_detected_labels.append(l_count)
+              TP_detection_delay.append(idx - l_start_time)
+              s_marked = True
+              break
+
       if s_marked == False:
         max_hist = min(FP_start_idx, grace_time)
         for i in range(max_hist):

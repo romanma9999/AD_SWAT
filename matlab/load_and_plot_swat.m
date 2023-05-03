@@ -11,9 +11,11 @@ load('swat_attack.mat');
 [Pa{1},Pa{2},Pa{3},Pa{4},Pa{5},Pa{6}] = parse_swat(swat_attack);
 %plot_swat(Pa{1},Pa{2},Pa{3},Pa{4},Pa{5},Pa{6});
 
+PID = 5;
+
 figure;
-stackedplot(Pn{2})
-title('P2 normal')
+stackedplot(Pn{PID});
+title(['P' num2str(PID) ' normal']);
 figure;
-stackedplot(Pa{2})
-title('P2 attack')
+stackedplot(Pa{PID});
+title(['P' num2str(PID) ' attack']);

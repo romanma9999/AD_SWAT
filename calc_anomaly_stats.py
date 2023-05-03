@@ -22,7 +22,8 @@ parser.add_argument('--raw_threshold', '-rth', default=0.4, type=float, help="ra
 parser.add_argument('--logl_threshold', '-lglth', default=0.6, type=float, help="log likelihood anomaly score threshold")
 parser.add_argument('--mean_window', '-rw', default=9, type=int, help="moving mean anomaly score window")
 parser.add_argument('--mean_threshold', '-mth', default=0.6, type=float, help="moving mean anomaly score threshold")
-parser.add_argument('--sum_window', '-sw', default=12, type=int, help="moving sum anomaly score window")
+parser.add_argument('--grace_time', '-gt', default=1200, type=int, help="unify grace time")
+parser.add_argument('--sum_window', '-sw', default=120, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.7, type=float, help="moving sum anomaly score threshold")
 # parser.add_argument('--training_count', '-tc', default=414000, type=int, help="training points count")
 parser.add_argument('--excel_filename', '-efn', default="swat_htm_results", type=str)
@@ -32,7 +33,6 @@ parser.add_argument('--verbose', default=False, action='store_true')
 parser.add_argument('--training_score', default=False, action='store_true')
 parser.add_argument('--channel_type', '-ctype', metavar='CHANNEL_TYPE', default=0, type=int,help='set type 0 for analog, 1 for discrete')
 parser.add_argument('--sdr_size', '-size', metavar='SDR_SIZE', default=2048, type=int)
-parser.add_argument('--grace_time', '-gt', default=120, type=int, help="unify grace time")
 parser.add_argument('--final_stage', default=False, action='store_true')
 
 

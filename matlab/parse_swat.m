@@ -19,9 +19,10 @@ P6 = data(1:sampling_interval:end,{'FIT601','P601','P602','P603','Normal'});
 % K-S Statistic higher than 0.25 : AIT402, AIT201, AIT501, AIT502, AIT202, AIT504, FIT301, PIT502, PIT503, FIT503, PIT501, AIT203, AIT401, AIT503, FIT601
 % Training and test empirical distributions do not match : P201
 %
-%
-%
-%
+% AIT202, AIT504
+% yes : AIT202, AIT203, AIT402, AIT501,AIT502, AIT503, AIT504, FIT301, 
+% yes : PIT501, PIT502, FIT503, FIT601,PIT503
+% no : AIT201, AIT401
 
 
 % P1 = data(:,{'FIT101','LIT101','MV101','P101','P102','Normal'});

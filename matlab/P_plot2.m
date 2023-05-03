@@ -34,9 +34,9 @@ for i = 1:n_var_to_plot
      
       plot(Ptime,addon + v,'DisplayName',Pnames{idx});
       hold on;
-      if idx == ScoreIdx 
+      if idx == ScoreIdx && threshold > 0
          v = ones(size(Pvar(:,idx)))*threshold;
-        plot(Ptime,addon + v,':r','LineWidth',1);
+        plot(Ptime,addon + v,':r','LineWidth',1,'DisplayName','detection threshold');
      end
     xlabel('datetime');
     grid on;

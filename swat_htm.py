@@ -35,7 +35,7 @@ parser.add_argument('--search_best_parameters', '-sbp', default=True, action='st
 parser.add_argument('--custom_min', '-cmin', metavar='MIN_VAL', default=2, type=int)
 parser.add_argument('--custom_max', '-cmax', metavar='MAX_VAL', default=3, type=int)
 # parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
-parser.add_argument('--sum_window', '-sw', default=119, type=int, help="moving sum anomaly score window")
+parser.add_argument('--sum_window', '-sw', default=120, type=int, help="moving sum anomaly score window")
 parser.add_argument('--sum_threshold', '-sth', default=0.6, type=float, help="moving sum anomaly score threshold")
 parser.add_argument('--limits_enabled', '-le', default=False, action='store_true')
 parser.add_argument('--encoding_duration_enabled', '-ede', default=True, action='store_true')
@@ -49,7 +49,7 @@ parser.add_argument('--override_parameters', '-op', default="", type=str,
                     help="override parameter values, group_name,var_name,val,res/../.. ,param value = val/res")
 parser.add_argument('--replay_buffer', '-rpb', default=0, type=int)
 parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
-parser.add_argument('--sampling', '-sg', default=10, type=int, help="sampling interval")
+parser.add_argument('--sampling', '-sg', default=1, type=int, help="sampling interval")
 
 default_parameters = {
     'enc': {
