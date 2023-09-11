@@ -1,6 +1,7 @@
 import csv
 import pandas
 from htm.bindings.sdr import SDR
+import random
 
 def read_input(input_path, meta_path, sampling_interval):
 # read input for running HTM on SWAT
@@ -425,10 +426,142 @@ def test_stage_id_to_global_id():
   ids = stage_id_to_global_id(1,[1,4,11])
   assert ids == [1,21,36], 'mapping error'
 
+def and_blist(x, y):
+    return [a and b for a, b in zip(x, y)]
+
+
+def or_blist(x, y):
+  return [a or b for a, b in zip(x, y)]
+
+
+def not_blist(x):
+  return [not a for a in x]
+
+
+def list2blist(x):
+  return [a != 0 for a in x]
+
+
+def blist2list(x):
+  return [int(a) for a in x]
+
+
+def SDR2blist(x):
+  val = [False] * x.size
+  for i in x.sparse:
+    val[i] = True
+
+  return val
+
+
+def blist2SDR(x):
+  res = SDR(len(x))
+  res.sparse = [i for i, val in enumerate(x) if x[i]]
+
+  return res
+
+
+def stable_cdt(SDRT, target_sparsity, permutation, alpha=1.1):
+  # assume SDR is binary list
+  type = 0
+  if type == 1:
+    rng = random.Random()
+    rng.seed(100)
+  else:
+    idx_perm = 0
+
+  #    SDRT = list2blist(bSDR)
+  N = len(SDRT)
+  SDR_FINAL = [False] * N
+  PKZ = list(SDRT)
+
+  NK0 = 0
+  NK1 = 0
+
+  while (sum(SDR_FINAL) / N < target_sparsity):
+    if type == 1:
+      rng.shuffle(PKZ)
+    else:
+      PKZ[:] = [PKZ[i] for i in permutation[idx_perm]]
+      idx_perm = 1 if idx_perm == 0 else 0
+
+    SDR_FINAL = or_blist(SDR_FINAL, and_blist(SDRT, PKZ))
+    NK1 = NK1 + 1
+
+  print(f"sparsity end of additive {sum(SDR_FINAL) / N}")
+
+  while (sum(SDR_FINAL) / N > target_sparsity * alpha):
+    if type == 1:
+      rng.shuffle(PKZ)
+    else:
+      PKZ[:] = [PKZ[i] for i in permutation[idx_perm]]
+      idx_perm = 1 if idx_perm == 0 else 0
+
+    SDR_FINAL = and_blist(SDR_FINAL, not_blist(PKZ))
+    NK0 = NK0 + 1
+
+  print(f"sparsity end of substructive {sum(SDR_FINAL) / N}")
+
+  return blist2list(SDR_FINAL), NK0, NK1
+
+
+def encode_sequence(SDR_SEQ, permutation):
+  # assume SDR_SEQ is binary list
+  #    rng = random.Random()
+  #    rng.seed(seed_val)
+  N = len(SDR_SEQ[0])
+  #    permutation = rng.shuffle(list(range(N)))
+
+  SDR_FINAL = [False] * N
+
+  # for 3 sdrs the final sdr is sdr[0] + sdr[1]*p + sdr[2]*p*p
+  for idx, sdr in enumerate(SDR_SEQ):
+    for i in range(idx+1):
+      sdr[:] = [sdr[j] for j in permutation]
+
+    SDR_FINAL = or_blist(SDR_FINAL, sdr)
+
+  return SDR_FINAL
+
+def test_cdt():
+  sdr_val = list()
+  sdr_bin_list = list()
+  rng = random.Random()
+  N = 2048
+  bits = 41
+  rng.seed(10)
+  sparsity = 0.02
+  permutation_cdt = list()
+  permutation_enc = list(range(N))
+  rng.shuffle(permutation_enc)
+  permutation_cdt.append(list(range(N)))
+  permutation_cdt.append(list(range(N)))
+  rng.shuffle(permutation_cdt[0])
+  rng.shuffle(permutation_cdt[1])
+
+  for i in range(16):
+    sdr_val.append(SDR(N))
+    sdr_val[i].sparse = list(range(20 + i, 61 + i))
+    sdr_bin_list.append(SDR2blist(sdr_val[i]))
+
+  sdr_encoded_bin = encode_sequence(sdr_bin_list, permutation_enc)
+  sdr_encoded = blist2SDR(sdr_encoded_bin)
+  sdr_cdt_bin,N0,N1 = stable_cdt(sdr_encoded_bin, sparsity, permutation_cdt)
+
+  sdr_cdt = blist2SDR(sdr_cdt_bin)
+
+  print(f"size: {sdr_cdt.size}, N0 {N0}, {N1}")
+
+
+def main():
+  test_cdt()
+  print("running..")
+
 if __name__ == "__main__":
-  test_stage_id_to_global_id()
+  #test_stage_id_to_global_id()
+
   # test_get_state_sdr()
   # test_calc_anomaly_stats()
   #test_count_continuous_ones()
-
+  main()
 
