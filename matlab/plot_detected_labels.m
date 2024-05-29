@@ -2,7 +2,7 @@ clc
 close all
 clear all
 
-postfix = 'diff1_delta_madics';
+postfix = 'diff_h1';
 %filename = 'swat_htm_results_learn_mixed';
 filename = 'swat_htm_results_learn_mixed_diff';
 fullpath = ['../HTM_results/' filename];
@@ -10,7 +10,7 @@ fullpath = ['../HTM_results/' filename];
 values = [1:6];
 
 first = 1;
-for i = 2:length(values)
+for i = 1:length(values)
     dl_fullname = [fullpath '_dl_P'  num2str(values(i)) '.csv' ];
     tfp_fullname = [fullpath '_TFP_P'  num2str(values(i)) '.csv' ];
     tprms_fullname = [fullpath '_params_P'  num2str(values(i)) '.csv' ];

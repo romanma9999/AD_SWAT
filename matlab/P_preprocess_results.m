@@ -1,6 +1,6 @@
 function P =  P_preprocess_results(filename, P,anomalylikelihoodThreshold,PID)
 
-data = load_htm_results_data(['../HTM_results/' filename]);
+data = load_htm_results_data(filename);
 data.title = "";
 
 

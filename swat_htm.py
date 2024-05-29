@@ -50,6 +50,8 @@ parser.add_argument('--override_parameters', '-op', default="", type=str,
 parser.add_argument('--replay_buffer', '-rpb', default=0, type=int)
 parser.add_argument('--encoding_type', '-et', metavar='ENCODING_TYPE', default='diff', choices=['raw', 'diff'], type=str.lower)
 parser.add_argument('--sampling', '-sg', default=1, type=int, help="sampling interval")
+parser.add_argument('--hierarchy_enabled', '-he', default=True, action='store_true')
+parser.add_argument('--hierarchy_lvl', '-hl', default=1, type=int)
 
 default_parameters = {
     'enc': {
@@ -104,7 +106,9 @@ def main(args):
                       'sum_threshold': args.sum_threshold,
                       'encoding_duration_value': args.encoding_duration_value,
                       'encoding_duration_enabled': args.encoding_duration_enabled,
-                      'sampling_interval': args.sampling
+                      'sampling_interval': args.sampling,
+                      'hierarchy_enabled': args.hierarchy_enabled,
+                      'hierarchy_lvl': args.hierarchy_lvl
                       }
 
     parameters = default_parameters
@@ -112,6 +116,7 @@ def main(args):
     parameters['enc']['sparsity'] = args.sdr_sparsity
     parameters['tm']['cellNewConnectionMaxSegmentsGap'] = args.connection_segments_gap
     parameters['runtime_config'] = runtime_config
+
 
     if len(args.override_parameters) > 0:
         records_list = [item for item in args.override_parameters.split('/')]
@@ -145,6 +150,7 @@ def main(args):
     parameters['runtime_config']['stage1_data'] = stage1_data
     n_records = len(input_data['records'])
     verbose = parameters['runtime_config']['verbose']
+    hierarchy_enabled = parameters['runtime_config']['hierarchy_enabled']
 
     print(f"training points count: {input_data['training_count']}")
     print(f"total points count: {n_records}")
@@ -160,6 +166,7 @@ def main(args):
         sum_window = parameters['runtime_config']['sum_window']
         sum_threshold = parameters['runtime_config']['sum_threshold']
         parameters['runtime_config']['verbose'] = False
+        parameters['runtime_config']['hierarchy_enabled'] = False
         best_window = w_arr[0]
         best_sdr = sdr_arr[0]
         min_score = 999999
@@ -218,6 +225,7 @@ def main(args):
     print('===========')
     parameters['runtime_config']['max_records_to_run'] = n_records
     parameters['runtime_config']['verbose'] = verbose
+    parameters['runtime_config']['hierarchy_enabled'] = hierarchy_enabled
 
     res = runner(input_data,parameters)
     save_results(res)
@@ -234,6 +242,8 @@ def runner(input_data,parameters):
     freeze_during_training = config['freeze_configuration'] == "during_training"
     output_filepath = config['output_path']
 
+    channel_type = config['channel_type']
+
     training_count = input_data['training_count']
     features_info = input_data['features']
     records = input_data['records']
@@ -243,6 +253,20 @@ def runner(input_data,parameters):
 
     black_list = white_black_list.get_black_list()
     white_list = white_black_list.get_white_list()
+
+    hierarchy_enabled = config['hierarchy_enabled']
+    hierarchy_lvl = config["hierarchy_lvl"]
+    hierarchy_current_lvl = 1
+    hierarchy_rng = random.Random()
+    hierarchy_rng.seed(10)
+    permutation_enc = list(range(sdr_size))
+    hierarchy_rng.shuffle(permutation_enc)
+    permutation_cdt = list()
+    permutation_cdt.append(list(range(sdr_size)))
+    permutation_cdt.append(list(range(sdr_size)))
+    hierarchy_rng.shuffle(permutation_cdt[0])
+    hierarchy_rng.shuffle(permutation_cdt[1])
+    hierarchy_sdr_buffer = collections.deque(maxlen=hierarchy_lvl)
 
     V1PrmName = config['var_name']
     var_white_list = []
@@ -418,6 +442,7 @@ def runner(input_data,parameters):
         with open(prm_output_filepath_json, 'w') as fj:
             fj.write(json.dumps(parameters))
 
+    init2 = True
 
     for count, record in enumerate(records):
         if count == max_records_to_run:
@@ -469,7 +494,25 @@ def runner(input_data,parameters):
             test_count += 1
 
         # Call the encoders to create bit representations for each value.  These are SDR objects.
-        default_encoding = V1Encoder.encode(v1_val)
+
+        if channel_type == 1 or hierarchy_enabled == False or hierarchy_lvl == 1:
+            default_encoding = V1Encoder.encode(v1_val)
+        else:
+            hierarchy_sdr_buffer.append(swat_utils.SDR2blist(V1Encoder.encode(v1_val)))
+
+            if hierarchy_current_lvl == hierarchy_lvl:
+                sdr_encoded_bin = swat_utils.encode_sequence(list(hierarchy_sdr_buffer), permutation_enc)
+                #sdr_encoded = swat_utils.blist2SDR(sdr_encoded_bin)
+                sdr_cdt_bin, N0, N1 = swat_utils.stable_cdt(sdr_encoded_bin, sdr_sparsity, permutation_cdt)
+                #print(f"size: {sdr_cdt.size}, N0 {N0}, {N1}")
+                default_encoding = swat_utils.blist2SDR(sdr_cdt_bin)
+                # for rolling window keep hierarchy_current_lvl value..
+                # TBD other options
+                # hierarchy_current_lvl = 1
+            else:
+                hierarchy_current_lvl = hierarchy_current_lvl + 1
+                continue
+
         # encoding_map_idx 0 is the default 1:1 encoding
         if encoding_map_idx:
             val1_encoding = SDR(total_encoding_width)
@@ -512,10 +555,12 @@ def runner(input_data,parameters):
         if encoding_type == 'raw':
             run_tm = True
         if encoding_type == 'diff':
-            if count < 2:
+            if init2 == True:
                 run_tm = True
+                init2 = False
                 prev_default_encoding_delay = default_encoding
                 prev_val1_encoding = val1_encoding
+
 
             if prev_val1_encoding != val1_encoding:
                 run_tm = True

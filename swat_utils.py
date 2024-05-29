@@ -488,7 +488,7 @@ def stable_cdt(SDRT, target_sparsity, permutation, alpha=1.1):
     SDR_FINAL = or_blist(SDR_FINAL, and_blist(SDRT, PKZ))
     NK1 = NK1 + 1
 
-  print(f"sparsity end of additive {sum(SDR_FINAL) / N}")
+  #print(f"sparsity end of additive {sum(SDR_FINAL) / N}")
 
   while (sum(SDR_FINAL) / N > target_sparsity * alpha):
     if type == 1:
@@ -500,7 +500,7 @@ def stable_cdt(SDRT, target_sparsity, permutation, alpha=1.1):
     SDR_FINAL = and_blist(SDR_FINAL, not_blist(PKZ))
     NK0 = NK0 + 1
 
-  print(f"sparsity end of substructive {sum(SDR_FINAL) / N}")
+  #print(f"sparsity end of substructive {sum(SDR_FINAL) / N}")
 
   return blist2list(SDR_FINAL), NK0, NK1
 
@@ -542,9 +542,14 @@ def test_cdt():
   for i in range(16):
     sdr_val.append(SDR(N))
     sdr_val[i].sparse = list(range(20 + i, 61 + i))
+
+  for i in range(16):
     sdr_bin_list.append(SDR2blist(sdr_val[i]))
 
   sdr_encoded_bin = encode_sequence(sdr_bin_list, permutation_enc)
+
+
+
   sdr_encoded = blist2SDR(sdr_encoded_bin)
   sdr_cdt_bin,N0,N1 = stable_cdt(sdr_encoded_bin, sparsity, permutation_cdt)
 

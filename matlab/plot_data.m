@@ -5,23 +5,25 @@ function plot_data(x,data,anomalylikelihoodThreshold,plot_type)
 
     switch plot_type
          case 1
-              sliding_window_anomaly = movmean(data.anomaly,[3 0]);
-              plot(x,sliding_window_anomaly,'red','LineWidth',2)
-              legend('anomaly score')
-              title(['average anomaly score' data.title]);
+              anomaly_sum = movsum(data.anomaly,[119,0]);
+              tmp = anomaly_sum>1;
+              anomaly_sum(tmp) = 1;
+              plot(x,anomaly_sum,'red','LineWidth',2)
+              %legend('Temporal Sum Score (2 min)')
+              title(['anomaly score ' data.title]);
          case 2
               plot(x,data.anomaly,'red','LineWidth',2)
-              legend('anomaly score')
-              title(['anomaly score' data.title]);
+              %legend('anomaly score')
+              title(['anomaly score ' data.title]);
          case 3
               sliding_window_anomaly = movmean(data.anomalylikelihood,[3 0]);
               plot(x,sliding_window_anomaly,'red','LineWidth',2)
-              legend('anomaly likelihood')
+              %legend('anomaly likelihood')
               title(['average anomaly likelihood  ' data.title]);
          case 4
                plot(x,anomaly_tmp,'red','LineWidth',2)
                legend('Input','anomaly likelihood')
-               title(['anomaly likelihood > ' num2str(anomalylikelihoodThreshold) '  ' data.title]);
+               %title(['anomaly likelihood > ' num2str(anomalylikelihoodThreshold) '  ' data.title]);
      end
    
     xlabel("Time")
